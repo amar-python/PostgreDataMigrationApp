@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Defence T&E Database Framework
 
 > A fully parameterised, idempotent **PostgreSQL database framework** for Defence **Test & Evaluation (T&E)** programme management — covering TEMP documents, VCRM traceability, test execution, defect reporting, and multi-environment deployment, with a built-in SQL test suite.
@@ -383,3 +384,6 @@ Built with Australian Defence T&E practice in mind, referencing:
 - Australian Signals Directorate (ASD) Information Security Manual (ISM)
 - Defence Science and Technology (DST) Group T&E methodology
 - VCRM principles aligned with MIL-STD-882 and AS/NZS ISO 31000
+=======
+# PostgreDataMigrationApp
+>>>>>>> a832e91f7db4d6a0431d793dbcccfcbc6f17b097
