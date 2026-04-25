@@ -1,0 +1,59 @@
+# =============================================================================
+# .gitignore — Defence T&E Database Framework
+# =============================================================================
+
+# ── Secrets & local overrides ─────────────────────────────────────────────────
+# Never commit passwords, connection strings, or local env overrides
+*.secret
+*.env
+.env*
+local_*.sql
+*_local.sql
+*_secrets.sql
+
+# If you create a local override of any environment file, name it:
+#   environments/env_dev_local.sql  ← this pattern is ignored
+environments/*_local.sql
+environments/*_override.sql
+
+# ── PostgreSQL dumps & exports ────────────────────────────────────────────────
+*.dump
+*.sql.gz
+*.backup
+*.bak
+pg_dump_*
+
+# ── Test output ───────────────────────────────────────────────────────────────
+/tmp/
+test_output/
+*.out
+*.log
+
+# ── OS-generated files ────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Editor / IDE files ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.orig
+
+# ── Python (if scripts are added later) ──────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# ── Node (if tooling is added later) ─────────────────────────────────────────
+node_modules/
+npm-debug.log*
