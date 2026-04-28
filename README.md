@@ -373,7 +373,7 @@ psql -U postgres -d te_mgmt_dev \
 
 ```
 ============================================================
- DEFENCE T&E TEST SUITE   Schema: te_dev
+ T&E TEST SUITE   Schema: te_dev
 ============================================================
 
 REPORT 1: Suite Summary
