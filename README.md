@@ -1,26 +1,32 @@
-#  T&E Database Framework
+# PostgreDataMigrationApp
 
-> A fully parameterised, idempotent **PostgreSQL database framework** for  **Test & Evaluation (T&E)** programme management — covering TEMP documents, VCRM traceability, test execution, defect reporting, and multi-environment deployment, with a built-in SQL test suite.
+> A fully parameterised, multi-database **Defence Test & Evaluation (T&E) management framework** — supporting PostgreSQL, MariaDB, SQLite, InfluxDB, Redis, and Teradata across Dev, Test, Staging, and Prod environments, with an interactive setup wizard, 85-assertion SQL test suite, and Terraform-managed GitHub repository configuration.
 
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13%2B-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-10.6%2B-003545?logo=mariadb&logoColor=white)](https://mariadb.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-3.35%2B-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![InfluxDB](https://img.shields.io/badge/InfluxDB-2.x-22ADF6?logo=influxdb&logoColor=white)](https://www.influxdata.com/)
+[![Redis](https://img.shields.io/badge/Redis-7.x-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Teradata](https://img.shields.io/badge/Teradata-Vantage_17%2B-F37440)](https://www.teradata.com/)
+[![Terraform](https://img.shields.io/badge/Terraform-1.5%2B-7B42BC?logo=terraform&logoColor=white)](https://developer.hashicorp.com/terraform)
+[![Tests](https://img.shields.io/badge/Tests-85%20assertions%20%7C%20100%25%20pass-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Environments](https://img.shields.io/badge/Environments-Dev%20%7C%20Test%20%7C%20Staging%20%7C%20Prod-blue)]()
-[![Test Suites](https://img.shields.io/badge/Tests-5%20suites%20%7C%2085%20assertions-brightgreen)]()
 
 ---
 
 ## What This Is
 
-This project provides a **production-grade SQL framework** to stand up a  T&E management database from scratch — on a single PostgreSQL server or across multiple environments. It is designed to support the full T&E lifecycle as practised in Australian  acquisition:
+A **production-grade database framework** for Australian Defence Test & Evaluation programme management. It supports the full T&E data lifecycle across six database engines, managed through a single interactive setup wizard and deployed with one command.
 
-- **Program management** — test programs, TEMP versioning, DT&E / AT&E / OT&E phases
+**Core capabilities:**
+
+- **Program management** — test programs, TEMP document versioning, DT&E / AT&E / OT&E phases
 - **Requirement traceability** — system requirements linked to test cases via a VCRM (Verification Cross Reference Matrix)
 - **Test execution** — events, results, verdicts, and evidence artefacts
-- **Defect reporting** — deficiency reports (DRs) linked directly to failed results
-- **Multi-environment isolation** — separate databases, schemas, and users for Dev, Test, Staging, and Prod
-- **Automated data testing** — 85 assertions across 5 SQL test suites, all written in pure PostgreSQL
-
-All names (database, schema, users, every table) are controlled by a single `\set` configuration block at the top of each environment file. Rename anything in one place and the entire script updates automatically.
+- **Defect reporting** — deficiency reports (DRs) linked directly to failed test results
+- **Multi-engine support** — PostgreSQL, MariaDB, SQLite, InfluxDB, Redis, Teradata
+- **Multi-environment isolation** — Dev, Test, Staging, and Prod each with separate databases, schemas, and users
+- **Automated data testing** — 85 assertions across 5 SQL test suites, written in pure PostgreSQL
 
 ---
 
@@ -29,9 +35,9 @@ All names (database, schema, users, every table) are controlled by a single `\se
 | Role | How you use this |
 |---|---|
 | **T&E Engineers / Analysts** | Understand the data model — VCRM, TEMP versioning, DR lifecycle |
-| **Database Administrators** | Deploy and maintain the schema across isolated environments |
-| **DevOps / Platform Engineers** | Plug `deploy_all.sh` and `run_tests.sh` into CI/CD pipelines |
-| **Students / Learners** | Study parameterised SQL, idempotent DDL patterns, and SQL-native testing |
+| **Database Administrators** | Deploy and maintain the schema across isolated environments and engines |
+| **DevOps / Platform Engineers** | Integrate `deploy_all.sh` and `run_tests.sh` into CI/CD pipelines; manage repos with Terraform |
+| **Students / Learners** | Study parameterised SQL, idempotent DDL, SQL-native testing, and multi-engine adapter patterns |
 
 ---
 
@@ -40,28 +46,62 @@ All names (database, schema, users, every table) are controlled by a single `\se
 ```
 PostgreDataMigrationApp/
 │
-├── te_core_schema.sql              ← Master schema — all DDL, triggers, seed data
-│                                     Do NOT run directly; called by environment files
+├── adapters/                           ← Engine-specific deployment adapters
+│   ├── adapter_postgresql.sh           ← PostgreSQL 15 (psql + \set variables)
+│   ├── adapter_mariadb.sh              ← MariaDB / MySQL (mysql CLI + sed substitution)
+│   ├── adapter_sqlite.sh               ← SQLite 3 (sqlite3 CLI + sed substitution)
+│   ├── adapter_influxdb.sh             ← InfluxDB 2.x (influx CLI + line protocol)
+│   ├── adapter_redis.sh                ← Redis 7.x (redis-cli HSET/SADD)
+│   └── adapter_teradata.sh             ← Teradata Vantage (BTEQ + sed substitution)
 │
-├── environments/
-│   ├── env_dev.sql                 ← Dev     │ DB: te_mgmt_dev     │ Seed: ON
-│   ├── env_test.sql                ← Test    │ DB: te_mgmt_test    │ Seed: ON
-│   ├── env_staging.sql             ← Staging │ DB: te_mgmt_staging │ Seed: OFF
-│   └── env_prod.sql                ← Prod    │ DB: te_mgmt_prod    │ Seed: OFF
+├── schema/                             ← Engine-specific DDL and seed data
+│   ├── postgresql/
+│   │   ├── te_core_schema.sql          ← PostgreSQL DDL (uuid-ossp, pg_trgm, triggers)
+│   │   └── te_seed_data.sql            ← PostgreSQL seed data (psql \set variables)
+│   ├── mariadb/
+│   │   ├── te_core_schema.sql          ← MariaDB DDL (InnoDB, ENUM, ON UPDATE)
+│   │   └── te_seed_data.sql            ← MariaDB seed data ({{placeholder}} substitution)
+│   ├── sqlite/
+│   │   ├── te_core_schema.sql          ← SQLite DDL (WAL, CHECK constraints, triggers)
+│   │   └── te_seed_data.sql            ← SQLite seed data ({{placeholder}} substitution)
+│   ├── influxdb/
+│   │   └── te_seed_data.lp             ← InfluxDB line protocol seed data
+│   ├── redis/
+│   │   └── te_seed_data.sh             ← Redis seed data (HSET/SADD bash script)
+│   └── teradata/
+│       ├── te_core_schema.sql          ← Teradata DDL (SET TABLE, PRIMARY INDEX, BTEQ)
+│       └── te_seed_data.sql            ← Teradata seed data (BTEQ INSERT statements)
+│
+├── environments/                       ← PostgreSQL per-environment launchers
+│   ├── env_dev.sql                     ← Dev     | DB: te_mgmt_dev     | Seed: ON
+│   ├── env_test.sql                    ← Test    | DB: te_mgmt_test    | Seed: ON
+│   ├── env_staging.sql                 ← Staging | DB: te_mgmt_staging | Seed: OFF
+│   └── env_prod.sql                    ← Prod    | DB: te_mgmt_prod    | Seed: OFF
 │
 ├── tests/
 │   ├── framework/
-│   │   └── test_framework.sql      ← Assertion library + results table
+│   │   └── test_framework.sql          ← Assertion library + results table + reporters
 │   ├── suites/
 │   │   ├── test_01_organisations_personnel.sql
 │   │   ├── test_02_programs_phases.sql
 │   │   ├── test_03_requirements_vcrm.sql
 │   │   ├── test_04_execution_defects.sql
 │   │   └── test_05_schema_and_business_rules.sql
-│   ├── run_all_tests.sql           ← Master test orchestrator
-│   └── run_tests.sh                ← Bash wrapper (coloured output + summary)
+│   ├── run_all_tests.sql               ← Master test orchestrator
+│   └── run_tests.sh                    ← Bash wrapper (reads config.local.env)
 │
-├── deploy_all.sh                   ← Deploy one or all environments
+├── terraform-github-repos/             ← GitHub repos as Infrastructure as Code
+│   ├── main.tf                         ← GitHub provider + repository resources
+│   ├── variables.tf                    ← All repo config (edit here to add repos)
+│   ├── outputs.tf                      ← Repository URLs printed after apply
+│   ├── terraform.tfvars.example        ← Token template — copy to terraform.tfvars
+│   ├── .gitignore
+│   └── README.md
+│
+├── setup.sh                            ← Interactive multi-database configuration wizard
+├── deploy_all.sh                       ← Multi-engine deployment router
+├── config.env                          ← Central config template (all 6 engines)
+├── te_core_schema.sql                  ← PostgreSQL master schema (legacy entry point)
 ├── .gitignore
 ├── LICENSE
 └── README.md
@@ -73,10 +113,17 @@ PostgreDataMigrationApp/
 
 | Requirement | Version | Notes |
 |---|---|---|
-| PostgreSQL | 13+ | Extensions used: `uuid-ossp`, `pg_trgm`, `dblink` |
+| PostgreSQL | 15 | Extensions: `uuid-ossp`, `pg_trgm`, `dblink` |
 | psql client | Matching server | Must support `\set`, `\if`, `\i` metacommands |
-| bash | 4.0+ | For `deploy_all.sh` and `run_tests.sh` |
+| bash | 4.0+ | For `setup.sh`, `deploy_all.sh`, `run_tests.sh` |
 | Superuser access | — | Required to create databases and roles |
+| Terraform | 1.5+ | For GitHub repo management (`terraform-github-repos/`) |
+| GitHub PAT | — | Required by Terraform — scope: `repo` |
+| MariaDB / MySQL | 10.6+ / 8.0+ | `DB_ENGINE=mariadb` — requires `mysql` CLI on PATH |
+| SQLite | 3.35+ | `DB_ENGINE=sqlite` — requires `sqlite3` CLI on PATH |
+| InfluxDB | 2.x | `DB_ENGINE=influxdb` — requires `influx` CLI v2 on PATH |
+| Redis | 7.x | `DB_ENGINE=redis` — requires `redis-cli` on PATH |
+| Teradata | Vantage 17+ | `DB_ENGINE=teradata` — requires `bteq` (TTU) on PATH |
 
 > **Windows users:** Use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) or [Git Bash](https://gitforwindows.org/) to run the shell scripts. The `.sql` files work natively on any platform via `psql`.
 
@@ -87,37 +134,76 @@ PostgreDataMigrationApp/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/PostgreDataMigrationApp.git
+git clone https://github.com/amar-python/PostgreDataMigrationApp.git
 cd PostgreDataMigrationApp
 ```
 
-### 2. Deploy an environment
+### 2. Run the interactive setup wizard
 
 ```bash
-# Dev only (includes realistic seed data)
-psql -U postgres -f environments/env_dev.sql
-
-# Or deploy all 4 environments at once
-chmod +x deploy_all.sh
-./deploy_all.sh
+chmod +x setup.sh
+./setup.sh
 ```
 
-### 3. Run the test suite
+The wizard prompts you to select a database engine and configure all connection settings, then writes `config.local.env` (gitignored — never committed):
+
+```
+  ╔══════════════════════════════════════════════════════════════╗
+  ║       PostgreDataMigrationApp — Database Setup Wizard        ║
+  ║   Supports: PostgreSQL · MariaDB · SQLite · InfluxDB         ║
+  ║             Redis · Teradata                                  ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  1)  postgresql  — PostgreSQL 15      (relational, ACID, recommended)
+  2)  mariadb     — MariaDB 10.x       (relational, MySQL-compatible)
+  3)  mysql       — MySQL 8.x          (relational, MySQL protocol)
+  4)  sqlite      — SQLite 3           (embedded, file-based, no server)
+  5)  influxdb    — InfluxDB 2.x       (time-series, metrics & events)
+  6)  redis       — Redis 7.x          (in-memory key-value / cache)
+  7)  teradata    — Teradata Vantage   (enterprise data warehouse)
+```
+
+Or skip the wizard and use flags:
+
+```bash
+./setup.sh --defaults                  # accept all defaults silently
+./setup.sh --engine teradata           # pre-select engine
+./setup.sh --engine sqlite --env dev   # pre-select engine + environment
+```
+
+### 3. Deploy an environment
+
+```bash
+# Deploy Dev only (with seed data)
+./deploy_all.sh dev
+
+# Deploy all 4 environments
+./deploy_all.sh
+
+# Override the engine inline
+DB_ENGINE=sqlite ./deploy_all.sh dev
+
+# Target a remote host
+PGHOST=my-db-server ./deploy_all.sh staging
+```
+
+### 4. Run the test suite (PostgreSQL)
 
 ```bash
 chmod +x tests/run_tests.sh
-./tests/run_tests.sh dev        # test Dev
-./tests/run_tests.sh            # test all 4 environments
+
+./tests/run_tests.sh dev   # test Dev environment
+./tests/run_tests.sh       # test all 4 environments
 ```
 
-### 4. Connect and explore
+### 5. Connect and explore (PostgreSQL)
 
 ```bash
 psql -U te_dev_user -d te_mgmt_dev
 
 -- VCRM coverage for CYB9131
 SELECT r.req_identifier, r.title, COUNT(v.tc_id) AS tc_mapped
-FROM   te_dev.requirements   r
+FROM   te_dev.requirements  r
 LEFT   JOIN te_dev.vcrm_entries v ON v.req_id = r.req_id
 GROUP  BY r.req_identifier, r.title
 ORDER  BY r.req_identifier;
@@ -125,48 +211,57 @@ ORDER  BY r.req_identifier;
 
 ---
 
-## How Parameterisation Works
+## Database Engine Support
 
-Every environment file contains **only a `\set` configuration block** followed by `\i te_core_schema.sql`. All logic lives in the core schema — the environment file is pure configuration.
+### Adapter routing
 
-```sql
--- environments/env_dev.sql — the ONLY file you edit for Dev
-\set env_label          DEV
-\set db_name            te_mgmt_dev       ← rename the database here
-\set schema_name        te_dev            ← rename the schema here
-\set app_user           te_dev_user
-\set app_password       Dev@Local#2025!
-\set tbl_test_cases     test_cases        ← rename any table here
-\set include_seed_data  true              ← toggle seed data on/off
+`deploy_all.sh` reads `DB_ENGINE` from `config.local.env` and routes to the correct adapter:
 
-\i te_core_schema.sql                     ← unchanged core logic
+```
+deploy_all.sh
+    ├── DB_ENGINE=postgresql  →  adapters/adapter_postgresql.sh
+    │                              schema/postgresql/te_core_schema.sql
+    │                              schema/postgresql/te_seed_data.sql
+    ├── DB_ENGINE=mariadb     →  adapters/adapter_mariadb.sh
+    │                              schema/mariadb/te_core_schema.sql
+    │                              schema/mariadb/te_seed_data.sql
+    ├── DB_ENGINE=sqlite      →  adapters/adapter_sqlite.sh
+    │                              schema/sqlite/te_core_schema.sql
+    │                              schema/sqlite/te_seed_data.sql
+    ├── DB_ENGINE=influxdb    →  adapters/adapter_influxdb.sh
+    │                              schema/influxdb/te_seed_data.lp
+    ├── DB_ENGINE=redis       →  adapters/adapter_redis.sh
+    │                              schema/redis/te_seed_data.sh
+    └── DB_ENGINE=teradata    →  adapters/adapter_teradata.sh
+                                   schema/teradata/te_core_schema.sql
+                                   schema/teradata/te_seed_data.sql
 ```
 
-**psql variable syntax used throughout the core schema:**
+### Engine feature comparison
 
-| Syntax | Expands to | Used for |
-|---|---|---|
-| `:'varname'` | `'quoted string'` | String literals, WHERE clauses, DO blocks |
-| `:"varname"` | `"quoted identifier"` | Table and schema names in DDL/DML |
+| Feature | PostgreSQL | MariaDB | SQLite | InfluxDB | Redis | Teradata |
+|---|---|---|---|---|---|---|
+| Schema DDL | ✅ | ✅ | ✅ | N/A | N/A | ✅ |
+| Seed data | ✅ | ✅ | ✅ | ✅ (LP) | ✅ (bash) | ✅ |
+| 4 environments | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| FK constraints | ✅ | ✅ | ✅ | N/A | N/A | ✅ |
+| Auto-update triggers | ✅ | ✅ | ✅ | N/A | N/A | ❌ (app-side) |
+| SQL test suite | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Placeholder syntax | `\set` | `{{var}}` | `{{var}}` | CLI flags | env vars | `{{var}}` |
 
 ---
 
-## Environment Comparison
+## Environment Configuration
 
 | Setting | Dev | Test | Staging | Prod |
 |---|---|---|---|---|
-| Database | `te_mgmt_dev` | `te_mgmt_test` | `te_mgmt_staging` | `te_mgmt_prod` |
-| Schema | `te_dev` | `te_test` | `te_staging` | `te_prod` |
+| PostgreSQL DB | `te_mgmt_dev` | `te_mgmt_test` | `te_mgmt_staging` | `te_mgmt_prod` |
+| PostgreSQL Schema | `te_dev` | `te_test` | `te_staging` | `te_prod` |
 | App User | `te_dev_user` | `te_test_user` | `te_stg_user` | `te_prod_user` |
 | Connection Limit | 10 | 15 | 20 | 50 |
-| Seed Data | ✅ Full | ✅ Full | ❌ Empty | ❌ Empty |
+| Seed Data | ✅ ON | ✅ ON | ❌ OFF | ❌ OFF |
 
-Each environment is fully isolated. All four can run on the same PostgreSQL instance.
-
-To deploy to a remote host:
-```bash
-PGHOST=my-db-server PGPORT=5432 PGUSER=postgres ./deploy_all.sh staging
-```
+All four environments can run on the same database server instance — fully isolated by database name, schema, and user.
 
 ---
 
@@ -186,7 +281,7 @@ organisations ──< personnel
 
 | Table | Purpose |
 |---|---|
-| `organisations` |  agencies, prime contractors, test units |
+| `organisations` | Defence agencies, prime contractors, test units |
 | `personnel` | T&E workforce with clearance levels and roles |
 | `test_programs` | Top-level programmes (e.g. CYB9131, LAND 400 Ph3) |
 | `temp_documents` | Versioned TEMP documents (draft → approved → superseded) |
@@ -224,109 +319,79 @@ organisations ──< personnel
 
 ---
 
-## Seed Data (Dev & Test Only)
+## Seed Data
 
-Realistic Australian  T&E data is loaded automatically when `include_seed_data` is `true`.
+Realistic Australian Defence T&E data loaded automatically for Dev and Test environments:
 
 | Table | Records | Highlights |
 |---|---|---|
 | `organisations` | 5 | CASG, DST Group, Leidos, BAE Systems, JSTF |
-| `personnel` | 6 | Roles from test_director to safety_engineer; NV1–PV clearances |
-| `test_programs` | 2 | CYB9131 (PROTECTED), LAND 400 Ph3 (SECRET) |
-| `temp_documents` | 3 | Approved v1.0 + draft amendment for CYB9131; draft for LAND 400 |
+| `personnel` | 6 | Full range from test_director (PV clearance) to safety_engineer (NV1) |
+| `test_programs` | 2 | CYB9131 (PROTECTED/active), LAND400-P3 (SECRET/active) |
+| `temp_documents` | 3 | CYB9131: approved v1.0 + in_review v1.1; LAND400: draft v0.5 |
 | `test_phases` | 3 | CYB9131 DT&E (completed), OT&E (active), LAND400 AT&E (planned) |
 | `requirements` | 8 | 6 × CYB9131 (security, performance, functional, compliance), 2 × LAND400 |
-| `test_cases` | 8 | Security, performance, acceptance TCs against CYB9131 OT&E |
+| `test_cases` | 8 | MFA, AES-256, availability soak, audit log, RBAC, ISM, TLS |
 | `vcrm_entries` | 8 | 100% VCRM coverage for CYB9131; LAND400 intentionally uncovered |
-| `test_events` | 3 | EV01 completed, EV02 in-progress, EV03 planned |
-| `test_results` | 7 | 4 pass, 2 fail, 1 inconclusive — realistic mix |
-| `defect_reports` | 3 | DR-CYB-0001 (audit gap), 0002 (TLS 1.2), 0003 (session timeout) |
+| `test_events` | 3 | EV01 (completed), EV02 (in_progress), EV03 (planned) |
+| `test_results` | 7 | 4 pass, 2 fail, 1 inconclusive — realistic mix with DR linkage |
+| `defect_reports` | 3 | DR-CYB-0001 (major), DR-CYB-0002 (major), DR-CYB-0003 (minor) |
+| `evidence_artifacts` | 0 | Intentionally empty — no evidence files uploaded yet |
 
 ---
 
-## Test Suite
+## Test Suite (PostgreSQL)
 
-### Run it
+### Run
 
 ```bash
-# Against a single environment
-./tests/run_tests.sh dev
-
-# Against all environments
-./tests/run_tests.sh
-
-# Manually via psql
-psql -U postgres -d te_mgmt_dev \
-  --set schema_name=te_dev \
-  --set tbl_organisations=organisations \
-  --set tbl_personnel=personnel \
-  --set tbl_test_programs=test_programs \
-  --set tbl_temp_documents=temp_documents \
-  --set tbl_test_phases=test_phases \
-  --set tbl_requirements=requirements \
-  --set tbl_test_cases=test_cases \
-  --set tbl_vcrm_entries=vcrm_entries \
-  --set tbl_test_events=test_events \
-  --set tbl_test_results=test_results \
-  --set tbl_defect_reports=defect_reports \
-  --set tbl_evidence_artifacts=evidence_artifacts \
-  -f tests/run_all_tests.sql
+./tests/run_tests.sh dev    # single environment
+./tests/run_tests.sh        # all environments
 ```
 
-### Coverage — 85 assertions across 5 suites
+### 85 assertions across 5 suites
 
 | Suite | Assertions | What is tested |
 |---|---|---|
 | 01 — Organisations & Personnel | 17 | Row counts, FK integrity, CHECK/UNIQUE/NOT NULL constraints |
 | 02 — Programs, TEMP & Phases | 19 | Date rules, classification markings, status enums |
-| 03 — Requirements & VCRM | 21 | 100% VCRM coverage check, per-program gap detection |
+| 03 — Requirements & VCRM | 21 | 100% coverage check, per-program gap detection |
 | 04 — Execution & Defects | 28 | Verdict counts, DR linkage to fail results, resolved_at logic |
 | 05 — Schema & Business Rules | 20 | Table/index existence, trigger firing, cross-table rules |
 
-### Assertion functions
+### Assertion library
 
 | Function | Purpose |
 |---|---|
-| `assert_equals(suite, name, expected, actual)` | Exact value match |
+| `assert_equals(suite, name, expected, actual)` | Exact value match (any type) |
 | `assert_not_equals(suite, name, expected, actual)` | Values must differ |
-| `assert_row_count(suite, name, query, n)` | COUNT of query = N |
-| `assert_true(suite, name, sql_expr)` | Expression is TRUE |
-| `assert_false(suite, name, sql_expr)` | Expression is FALSE |
-| `assert_not_null(suite, name, query)` | Query returns a value |
-| `assert_null(suite, name, query)` | Query returns NULL |
+| `assert_row_count(suite, name, query, n)` | COUNT of query must equal N |
+| `assert_true(suite, name, sql_expression)` | SQL expression must be TRUE |
+| `assert_false(suite, name, sql_expression)` | SQL expression must be FALSE |
+| `assert_not_null(suite, name, query)` | Query must return a value |
+| `assert_null(suite, name, query)` | Query must return NULL |
 | `assert_raises(suite, name, query)` | Query must throw an exception |
 
-### Sample output
+---
 
+## Terraform — GitHub Repository Management
+
+Manages this repository as Infrastructure as Code using the official GitHub Terraform provider.
+
+```bash
+cd terraform-github-repos
+
+# Set your GitHub PAT
+export TF_VAR_github_token="ghp_yourtoken"   # Mac/Linux/Git Bash
+$env:TF_VAR_github_token="ghp_yourtoken"     # PowerShell
+
+terraform init     # download provider (run once)
+terraform plan     # preview changes
+terraform apply    # apply to GitHub
+terraform output   # print repo URLs
 ```
-============================================================
-  T&E TEST SUITE   Schema: te_dev
-============================================================
 
-REPORT 1: Suite Summary
-─────────────────────────────────────────────────────────────
- suite             total  passed  failed  pass_rate  status
- ──────────────── ──────  ──────  ──────  ─────────  ──────────────
- business_rules       8       8       0   100.0%     ✓ ALL PASS
- defect_reports      12      12       0   100.0%     ✓ ALL PASS
- organisations        8       8       0   100.0%     ✓ ALL PASS
- personnel            9       9       0   100.0%     ✓ ALL PASS
- programs            13      13       0   100.0%     ✓ ALL PASS
- requirements        11      11       0   100.0%     ✓ ALL PASS
- schema              20      20       0   100.0%     ✓ ALL PASS
- temp_documents       6       6       0   100.0%     ✓ ALL PASS
- test_cases           9       9       0   100.0%     ✓ ALL PASS
- test_events          8       8       0   100.0%     ✓ ALL PASS
- test_phases          6       6       0   100.0%     ✓ ALL PASS
- test_results         9       9       0   100.0%     ✓ ALL PASS
- vcrm                10      10       0   100.0%     ✓ ALL PASS
-
-REPORT 4: Overall Result
-─────────────────────────────────────────────────────────────
- total  passed  failed  pass_rate  overall
- ─────  ──────  ──────  ─────────  ───────────────────────
-    85      85       0   100.0%    ✓ ALL TESTS PASSED
-```
+Full instructions in [`terraform-github-repos/README.md`](terraform-github-repos/README.md).
 
 ---
 
@@ -334,27 +399,25 @@ REPORT 4: Overall Result
 
 The entire framework is safe to re-run against an existing database:
 
-- `CREATE DATABASE` / `CREATE ROLE` — wrapped in `DO $$ IF NOT EXISTS $$` guards
+- `CREATE DATABASE` / `CREATE ROLE` — wrapped in `IF NOT EXISTS` guards
 - `CREATE TABLE` — uses `IF NOT EXISTS`
 - `CREATE INDEX` — uses `IF NOT EXISTS`
 - `CREATE EXTENSION` — uses `IF NOT EXISTS`
-- Seed data — uses `ON CONFLICT DO NOTHING`
+- Seed data — uses `ON CONFLICT DO NOTHING` (PostgreSQL)
 - Triggers — `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER`
 
 ---
 
 ## Production Guidance
 
-- **Never commit real passwords** — use a secrets manager (Azure Key Vault, HashiCorp Vault, AWS Secrets Manager) and inject `app_password` at deploy time.
-- **Staging and Prod have seed data disabled** — load your own anonymised snapshot after deployment.
-- **Connection limits** per user are set conservatively by default — tune `conn_limit` to your workload.
-- The `evidence_artifacts` table is schema-only — wire it to your document store (SharePoint, S3, Azure Blob) via the `file_path` column.
+- **Never commit `config.local.env`** — it contains real passwords and is gitignored
+- **Use a secrets manager** for production passwords — Azure Key Vault, HashiCorp Vault, or AWS Secrets Manager
+- **Staging and Prod have seed data disabled** — load your own anonymised snapshot after deployment
+- The `evidence_artifacts` table is schema-only — wire it to your document store (SharePoint, S3, Azure Blob) via the `file_path` column
 
 ---
 
 ## Contributing
-
-Contributions are welcome. Please follow these steps:
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/your-feature-name`
@@ -364,8 +427,8 @@ Contributions are welcome. Please follow these steps:
 
 **Guidelines:**
 - Keep the framework idempotent — every change must be safe to re-run
-- Add at least one test assertion for any new table column or constraint
-- Follow the existing naming convention for tables (`tbl_*`), indexes (`idx_*`), and triggers (`trg_*`)
+- Add at least one assertion for any new table column or constraint
+- Follow the existing naming convention: tables (`tbl_*`), indexes (`idx_*`), triggers (`trg_*`)
 - Do not commit passwords, real classified data, or environment-specific connection strings
 
 ---
@@ -378,8 +441,8 @@ MIT — see [LICENSE](LICENSE) for full text.
 
 ## Acknowledgements
 
-Built with Australian  T&E practice in mind, referencing:
+Built for Australian Defence T&E practice, referencing:
 - ASDEFCON Test & Evaluation framework
 - Australian Signals Directorate (ASD) Information Security Manual (ISM)
--  Science and Technology (DST) Group T&E methodology
+- Defence Science and Technology (DST) Group T&E methodology
 - VCRM principles aligned with MIL-STD-882 and AS/NZS ISO 31000
