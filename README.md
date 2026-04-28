@@ -1,6 +1,6 @@
-# T&E Database Framework
+#  T&E Database Framework
 
-> A fully parameterised, idempotent **PostgreSQL database framework** for **Test & Evaluation (T&E)** programme management — covering TEMP documents, VCRM traceability, test execution, defect reporting, and multi-environment deployment, with a built-in SQL test suite.
+> A fully parameterised, idempotent **PostgreSQL database framework** for  **Test & Evaluation (T&E)** programme management — covering TEMP documents, VCRM traceability, test execution, defect reporting, and multi-environment deployment, with a built-in SQL test suite.
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13%2B-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -11,7 +11,7 @@
 
 ## What This Is
 
-This project provides a **production-grade SQL framework** to stand up a T&E management database from scratch — on a single PostgreSQL server or across multiple environments. It is designed to support the full T&E lifecycle as practised in the acquisition:
+This project provides a **production-grade SQL framework** to stand up a  T&E management database from scratch — on a single PostgreSQL server or across multiple environments. It is designed to support the full T&E lifecycle as practised in Australian  acquisition:
 
 - **Program management** — test programs, TEMP versioning, DT&E / AT&E / OT&E phases
 - **Requirement traceability** — system requirements linked to test cases via a VCRM (Verification Cross Reference Matrix)
@@ -186,7 +186,7 @@ organisations ──< personnel
 
 | Table | Purpose |
 |---|---|
-| `organisations` | agencies, prime contractors, test units |
+| `organisations` |  agencies, prime contractors, test units |
 | `personnel` | T&E workforce with clearance levels and roles |
 | `test_programs` | Top-level programmes (e.g. CYB9131, LAND 400 Ph3) |
 | `temp_documents` | Versioned TEMP documents (draft → approved → superseded) |
@@ -226,7 +226,7 @@ organisations ──< personnel
 
 ## Seed Data (Dev & Test Only)
 
-Realistic Australian T&E data is loaded automatically when `include_seed_data` is `true`.
+Realistic Australian  T&E data is loaded automatically when `include_seed_data` is `true`.
 
 | Table | Records | Highlights |
 |---|---|---|
@@ -300,7 +300,7 @@ psql -U postgres -d te_mgmt_dev \
 
 ```
 ============================================================
- T&E TEST SUITE   Schema: te_dev
+  T&E TEST SUITE   Schema: te_dev
 ============================================================
 
 REPORT 1: Suite Summary
@@ -349,5 +349,37 @@ The entire framework is safe to re-run against an existing database:
 - **Staging and Prod have seed data disabled** — load your own anonymised snapshot after deployment.
 - **Connection limits** per user are set conservatively by default — tune `conn_limit` to your workload.
 - The `evidence_artifacts` table is schema-only — wire it to your document store (SharePoint, S3, Azure Blob) via the `file_path` column.
-#   D a t a _ M i g r a t i o n _ T e s t _ R e v i e w 2  
- 
+
+---
+
+## Contributing
+
+Contributions are welcome. Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature-name`
+3. Make your changes and add or update tests in `tests/suites/`
+4. Verify all 85 assertions still pass: `./tests/run_tests.sh dev`
+5. Open a Pull Request with a clear description of what changed and why
+
+**Guidelines:**
+- Keep the framework idempotent — every change must be safe to re-run
+- Add at least one test assertion for any new table column or constraint
+- Follow the existing naming convention for tables (`tbl_*`), indexes (`idx_*`), and triggers (`trg_*`)
+- Do not commit passwords, real classified data, or environment-specific connection strings
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE) for full text.
+
+---
+
+## Acknowledgements
+
+Built with Australian  T&E practice in mind, referencing:
+- ASDEFCON Test & Evaluation framework
+- Australian Signals Directorate (ASD) Information Security Manual (ISM)
+-  Science and Technology (DST) Group T&E methodology
+- VCRM principles aligned with MIL-STD-882 and AS/NZS ISO 31000
