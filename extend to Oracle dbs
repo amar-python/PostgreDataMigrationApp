@@ -1,0 +1,111 @@
+In order to extend the current program to Oracle databases, I need to answer the following questions.
+
+Here is a progressive set of questions organised by phase, from planning through to completion:
+
+---
+
+## Phase 1 — Discovery & Planning
+
+1. What is the source database — type, version, size, and number of tables?
+2. What is the target Oracle Database version (e.g. 19c, 21c, 23ai)?
+3. What is the migration deadline and what are the acceptable downtime windows?
+4. Who are the key stakeholders and what are their sign-off requirements?
+5. What compliance, security, or data classification requirements apply to the data being migrated?
+6. Are there any data residency or sovereignty requirements (e.g. data must stay in Australia)?
+7. What tools are available — Oracle Data Pump, GoldenGate, SQL Developer, AWS DMS, or custom ETL?
+8. Is this a like-for-like migration or does the schema need to be restructured?
+
+---
+
+## Phase 2 — Source Analysis
+
+9. How many schemas, tables, views, stored procedures, and triggers exist in the source?
+10. What is the total data volume in GB/TB and how many rows per table?
+11. Which tables have the highest row counts and update frequencies?
+12. Are there any unsupported data types in the source that need to be mapped to Oracle equivalents?
+13. What character encoding is used in the source — and does it need to convert to AL32UTF8?
+14. Are there circular foreign key dependencies that could cause issues during load order?
+15. Are there any tables without primary keys or with duplicate rows?
+16. What indexes, sequences, and constraints exist and need to be recreated?
+
+---
+
+## Phase 3 — Target Environment Setup
+
+17. What Oracle edition is being used — Standard, Enterprise, or Autonomous?
+18. Is the target on-premises, Oracle Cloud Infrastructure (OCI), or a third-party cloud?
+19. What tablespace layout is required — data, index, temp, undo?
+20. What user accounts, roles, and privileges need to be created in Oracle?
+21. What are the storage, memory (SGA/PGA), and CPU sizing requirements?
+22. Is Oracle RAC (Real Application Clusters) or Data Guard required for high availability?
+23. What backup and recovery strategy will be in place during migration?
+24. Will Oracle Transparent Data Encryption (TDE) be enabled on the target?
+
+---
+
+## Phase 4 — Schema Migration
+
+25. How will DDL be extracted from the source and converted to Oracle syntax?
+26. Which data types need explicit mapping (e.g. `INT` → `NUMBER`, `VARCHAR` → `VARCHAR2`, `DATETIME` → `TIMESTAMP`)?
+27. How will auto-increment columns be handled — Oracle `IDENTITY` columns or `SEQUENCE` + `TRIGGER`?
+28. How will stored procedures, functions, and packages be converted to PL/SQL?
+29. Will views be migrated as-is or rewritten?
+30. How will indexes be created — before or after data load — and in what order?
+31. Will constraints be enabled during load or disabled and re-enabled afterwards?
+32. How will database links, synonyms, and public grants be handled?
+
+---
+
+## Phase 5 — Data Migration
+
+33. What is the extraction method — full export, incremental, or change data capture (CDC)?
+34. What is the load sequence to respect foreign key dependencies?
+35. Will Oracle Data Pump (expdp/impdp), SQL*Loader, or external tables be used for loading?
+36. How will large objects (BLOB, CLOB) be handled during migration?
+37. How will NULL values, default values, and computed columns be handled?
+38. What batch size will be used for loading to balance performance and rollback segment size?
+39. How will parallel load be configured across Oracle's parallel query slaves?
+40. How will the migration handle tables that are being actively written to during migration?
+
+---
+
+## Phase 6 — Data Validation & Testing
+
+41. How will row counts be compared between source and target for every table?
+42. How will checksums or hash comparisons be used to validate data integrity?
+43. Will a sample of records be manually cross-checked between source and target?
+44. How will referential integrity be verified after load (no orphaned foreign keys)?
+45. How will NULL counts, distinct value counts, and min/max values be compared?
+46. What business rules or domain validations need to pass before sign-off?
+47. Will the application be run against the migrated Oracle database in a test environment?
+48. What performance benchmarks need to be met before go-live?
+
+---
+
+## Phase 7 — Cutover Planning
+
+49. What is the cutover strategy — big bang, phased, or parallel run?
+50. How long is the cutover window and what triggers a rollback?
+51. Who has authority to approve go-live and who approves a rollback?
+52. How will the source database be put into read-only mode during final cutover?
+53. How will the delta (changes since initial load) be captured and applied to Oracle?
+54. How will application connection strings be switched from source to Oracle?
+55. What is the communication plan for end users during cutover?
+56. What monitoring is in place for the first 24–48 hours post cutover?
+
+---
+
+## Phase 8 — Post-Migration
+
+57. How will Oracle AWR (Automatic Workload Repository) reports be used to tune performance?
+58. Which indexes need to be rebuilt or statistics gathered after data load?
+59. Are there any missing indexes identified through execution plan analysis?
+60. How will Oracle's optimizer statistics be gathered and maintained going forward?
+61. What is the decommission plan for the source database?
+62. How will ongoing backup, patching, and maintenance be managed in Oracle?
+63. What documentation needs to be produced for the migrated schema and processes?
+64. What lessons learned should be captured for future migrations?
+
+---
+
+These 64 questions cover the full Oracle migration lifecycle. Would you like me to turn any of these phases into actual implementation scripts, test cases, or a project plan?
