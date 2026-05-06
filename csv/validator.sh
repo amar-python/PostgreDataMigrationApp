@@ -31,9 +31,7 @@ done
 
 # ── Remove BOM if present (UTF-8 BOM = EF BB BF) ─────────────────────────────
 # Use LOG_DIR for temp files — works on Windows Git Bash, WSL2, and Linux
-TEMP_DIR="${LOG_DIR:-$(pwd)/csv/logs}"
-mkdir -p "$TEMP_DIR"
-CLEAN_CSV="${TEMP_DIR}/csv_clean_$$.csv"
+CLEAN_CSV="${VALID_CSV%.csv}_clean_$$.csv"
 sed 's/^\xEF\xBB\xBF//' "$CSV_FILE" > "$CLEAN_CSV"
 
 # ── Check file is not empty ───────────────────────────────────────────────────
