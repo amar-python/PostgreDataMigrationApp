@@ -121,6 +121,9 @@ TABLE_NAME="$(echo "$TABLE_NAME" | tr '[:upper:]' '[:lower:]' | tr ' -' '__')"
 # ── Setup log directory and files ─────────────────────────────────────────────
 mkdir -p "$LOG_DIR"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+
+# Create a test file to confirm LOG_DIR is writable
+touch "${LOG_DIR}/.test" && rm -f "${LOG_DIR}/.test"
 SAFE_NAME="${TABLE_NAME}"
 LOG_FILE="${LOG_DIR}/${SAFE_NAME}_loaded_${TIMESTAMP}.log"
 SKIP_FILE="${LOG_DIR}/${SAFE_NAME}_skipped_${TIMESTAMP}.csv"
@@ -139,14 +142,14 @@ separator
 # ── Step 1: Validate CSV ──────────────────────────────────────────────────────
 info "Step 1/3 — Validating CSV..."
 
-VALIDATOR="${CSV_DIR}/validator.sh"
+VALIDATOR="${CSV_DIR}/validator.py"
 [[ ! -f "$VALIDATOR" ]] && { error "Validator not found: $VALIDATOR"; exit 1; }
 
 export CSV_FILE TABLE_NAME LOG_DIR SKIP_FILE TIMESTAMP
 VALID_CSV="${LOG_DIR}/${SAFE_NAME}_valid_${TIMESTAMP}.csv"
 export VALID_CSV
 
-if ! bash "$VALIDATOR"; then
+if ! python3 "${CSV_DIR}/validator.py"; then
    error "CSV validation failed. Check: ${SKIP_FILE}"
    exit 1
 fi
