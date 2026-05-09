@@ -25,9 +25,9 @@ YELLOW = '\033[1;33m'
 RED    = '\033[0;31m'
 NC     = '\033[0m'
 
-def log(msg):  print(f"{GREEN}  [validator ✓]{NC} {msg}")
-def warn(msg): print(f"{YELLOW}  [validator ⚠]{NC} {msg}")
-def err(msg):  print(f"{RED}  [validator ✗]{NC} {msg}", file=sys.stderr)
+def log(msg):  print(f"{GREEN}  [validator OK]{NC} {msg}")
+def warn(msg): print(f"{YELLOW}  [validator WARN]{NC} {msg}")
+def err(msg):  print(f"{RED}  [validator ERR]{NC} {msg}", file=sys.stderr)
 
 # ── Read environment variables ────────────────────────────────────────────────
 CSV_FILE   = os.environ.get('CSV_FILE',   '')

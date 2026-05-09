@@ -328,6 +328,9 @@ Realistic Australian T&E data is loaded automatically when `include_seed_data` i
 # Against all environments
 ./tests/run_tests.sh
 
+# Run Python validator tests
+python -m unittest -v tests/test_csv_validator.py
+
 # Manually via psql
 psql -U postgres -d te_mgmt_dev \
   --set schema_name=te_dev \
@@ -344,6 +347,13 @@ psql -U postgres -d te_mgmt_dev \
   --set tbl_defect_reports=defect_reports \
   --set tbl_evidence_artifacts=evidence_artifacts \
   -f tests/run_all_tests.sql
+```
+
+```powershell
+# Windows/PowerShell runner for Python validator tests
+powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
+# Optional: run a custom test path
+powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1" -TestPath "tests/test_csv_validator.py"
 ```
 
 ### Coverage — 85 assertions across 5 suites
