@@ -356,6 +356,33 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
 powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1" -TestPath "tests/test_csv_validator.py"
 ```
 
+### Windows / Cursor AI notes
+
+- `setup.sh`, `deploy_all.sh`, and `tests/run_tests.sh` are bash scripts.
+- On Windows, run shell scripts via WSL2 or Git Bash.
+- The Python validator tests are Windows-native and do not require WSL.
+- Required for Python validator tests:
+  - Python on PATH (`python --version`)
+  - PowerShell available (`pwsh` or `powershell`)
+- Recommended Windows command:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
+```
+
+### CI validation (Windows)
+
+A GitHub Actions workflow is included for Windows validation of the Python validator tests:
+
+- Workflow file: `.github/workflows/python-validator-tests.yml`
+- Runner: `windows-latest`
+- Python version: `3.11`
+- Command executed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
+```
+
 ### Coverage — 85 assertions across 5 suites
 
 | Suite | Assertions | What is tested |
