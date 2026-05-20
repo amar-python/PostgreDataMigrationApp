@@ -540,8 +540,112 @@ MIT — see [LICENSE](LICENSE) for full text.
 
 ## Acknowledgements
 
-Built with Australian T&E practice in mind, referencing:
-- ASDEFCON Test & Evaluation framework
-- Australian Signals Directorate (ASD) Information Security Manual (ISM)
-- Science and Technology (DST) Group T&E methodology
-- VCRM principles aligned with MIL-STD-882 and AS/NZS ISO 31000
+Here are the prompts, distilled from every action I actually performed today. Each one is self-contained and would run end-to-end without follow-up questions.
+
+---
+
+### Prompt 1 — Audit & Fix Stale Documentation
+```
+Audit all markdown docs and requirements.txt against the current codebase.
+For each file, check that referenced functions, imports, file paths, test
+counts, and CLI commands still match the code. Fix anything stale in-place.
+Push to GitHub with a summary of what changed and why.
+
+Files to check: README.md, FIXES_APPLIED.md, VALIDATION_REPORT.md,
+NEW_USER_NAVIGATION_GUIDE.md, requirements.txt
+```
+
+---
+
+### Prompt 2 — Generate Edge Case Datasets + Stress Tests
+```
+Generate synthetic edge case CSV datasets in sample_data/edge_cases/ and
+write matching pytest tests in tests/test_edge_cases.py. Cover these cases:
+
+- UTF-8 BOM in headers
+- Tab-delimited (.tsv)
+- Duplicate primary keys
+- Header-only (empty) CSV
+- Unicode (CJK, accented, Polish characters)
+- Nulls in required columns (empty string, "NULL", "N/A")
+- Special characters (embedded commas, quotes, apostrophes)
+- Ragged rows (inconsistent column count)
+- Wrong/missing column headers
+- Over-length string values exceeding max_length
+- Large file (10,000 rows) with a performance assertion under 5 seconds
+- Missing/nonexistent file path
+
+Each test should use the project's existing JobConfig and pre_import stage.
+Run the full test suite to confirm everything passes, then push to GitHub.
+```
+
+---
+
+### Prompt 3 — Run Tests + Generate Detailed Report for Lead
+```
+Run the full pytest suite and create TEST_REPORT.md at the project root.
+The report must include:
+
+- Summary line: total / passed / failed / skipped
+- A table per test file with columns: #, Test name, Marker (unit/integration),
+  Status, What it verifies
+- A "Note for Lead" section explaining that integration tests need a live
+  PostgreSQL database configured via .env, and that running `pytest -m unit`
+  deselects them by marker filter (not skipped due to failure)
+- A test data table listing every dataset file and its purpose
+
+Push TEST_REPORT.md to GitHub.
+```
+
+---
+
+### Prompt 4 — Repo Hygiene (one-shot cleanup)
+```
+Clean up the GitHub repo (amar-python/TestUploadtoGIT) in one pass:
+
+1. If files exist at both root and a nested path (e.g. OneDrive/Desktop/...),
+   keep the latest version at root and git rm the nested duplicate entirely.
+2. Add .abacusai/, .claude/, and any other tool/session folders to .gitignore
+   and untrack them with git rm --cached.
+3. Prune the reports/ folder to keep only the 5 most recent timestamped run
+   directories and their matching logs. Delete the rest.
+4. Add an auto-pruning rule to src/reporting.py that deletes old runs
+   beyond MAX_REPORT_RUNS (default 5) after each write_summary() call.
+   Make the limit configurable via env var.
+
+Commit each logical change separately and push to master.
+```
+
+---
+
+### Prompt 5 — Full Session (combines all of the above)
+```
+I have a CSV-to-PostgreSQL migration framework at:
+C:\Users\User\OneDrive\Desktop\Migration using ai
+GitHub repo: amar-python/TestUploadtoGIT
+
+Do the following in order:
+
+1. AUDIT DOCS — Check all .md files and requirements.txt against the code.
+   Fix anything stale.
+
+2. EDGE CASE TESTS — Generate 11+ synthetic CSV datasets covering BOM,
+   tab-delimited, Unicode, nulls, special chars, ragged rows, wrong headers,
+   overlength, large file (10k rows), duplicates, and empty file. Write
+   matching pytest tests. Run the suite to confirm all pass.
+
+3. TEST REPORT — Create TEST_REPORT.md listing every test with status,
+   marker, and description. Include a note for the lead about integration
+   tests requiring PostgreSQL.
+
+4. REPO HYGIENE — Flatten any nested paths to root level. Add tool folders
+   to .gitignore and untrack them. Prune reports/ to 5 most recent runs
+   and add auto-pruning logic to src/reporting.py (MAX_REPORT_RUNS=5).
+
+5. PUSH — Commit each logical change separately and push to master.
+   Confirm the final repo structure.
+```
+
+---
+
+The full session prompt (#5) would reproduce today's entire day of work in a single request. The individual prompts (#1-4) are useful when you only need one piece — they're modular so you can mix and match.
