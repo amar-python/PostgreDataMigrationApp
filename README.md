@@ -629,10 +629,8 @@ Do the following in order:
 1. AUDIT DOCS — Check all .md files and requirements.txt against the code.
    Fix anything stale.
 
-2. EDGE CASE TESTS — Generate 11+ synthetic CSV datasets covering BOM,
-   tab-delimited, Unicode, nulls, special chars, ragged rows, wrong headers,
-   overlength, large file (10k rows), duplicates, and empty file. Write
-   matching pytest tests. Run the suite to confirm all pass.
+2. EDGE CASE TESTS — Generate 11+ synthetic CSV datasets covering  Byte Order Mark(i.e., BOM it's a hidden character (\xEF\xBB\xBF) that some editors (especially Microsoft Excel) prepend to the beginning of UTF-8 files. The problem it causes: when a CSV has a BOM, the first column header gets silently corrupted — e.g. id becomes \xEF\xBB\xBFid, so column lookups by name fail. In the project, this is handled by the pre-import validator which strips the BOM from the first header.),
+tab-delimited, Unicode, nulls, special chars, ragged rows, wrong headers, overlength, large file (10k rows), duplicates, and empty file. Write matching pytest tests. Run the suite to confirm all pass.
 
 3. TEST REPORT — Create TEST_REPORT.md listing every test with status,
    marker, and description. Include a note for the lead about integration
