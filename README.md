@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Environments](https://img.shields.io/badge/Environments-Dev%20%7C%20Test%20%7C%20Staging%20%7C%20Prod-blue)]()
 [![Test Suites](https://img.shields.io/badge/Tests-5%20suites%20%7C%2085%20assertions-brightgreen)]()
+[![Evals](https://img.shields.io/badge/Evals-23%20CSV%20scenarios-brightgreen)]()
 [![Terraform](https://img.shields.io/badge/Terraform-1.5%2B-7B42BC?logo=terraform&logoColor=white)](https://developer.hashicorp.com/terraform)
 
 ---
@@ -20,6 +21,7 @@ This project provides a **production-grade SQL framework** to stand up a T&E man
 - **Defect reporting** — deficiency reports (DRs) linked directly to failed results
 - **Multi-environment isolation** — separate databases, schemas, and users for Dev, Test, Staging, and Prod
 - **Automated data testing** — 85 assertions across 5 SQL test suites, all written in pure PostgreSQL
+- **Data-driven evals** — 23 offline CSV validator scenarios plus PostgreSQL-backed idempotency and full-suite checks
 
 All names (database, schema, users, every table) are controlled by a single `\set` configuration block at the top of each environment file. Rename anything in one place and the entire script updates automatically.
 
@@ -83,6 +85,12 @@ PostgreDataMigrationApp/
 │   │   └── test_05_schema_and_business_rules.sql
 │   ├── run_all_tests.sql           ← Master test orchestrator
 │   └── run_tests.sh                ← Bash wrapper (reads config.local.env)
+│
+├── evals/                         ← Data-driven operational evals
+│   ├── runner.py                  ← Scenario discovery, diff engine, JSON reports
+│   ├── datasets/tier_p/           ← 23 offline CSV validator scenarios
+│   ├── expected/tier_p/           ← Expected outputs for validator evals
+│   └── reports/                   ← Generated reports (gitignored)
 │
 ├── terraform-github-repos/         ← GitHub repos as Infrastructure as Code
 │   ├── main.tf
@@ -331,6 +339,12 @@ Realistic Australian T&E data is loaded automatically when `include_seed_data` i
 # Run Python tests
 python -m unittest discover -s tests -p "test*.py" -v
 
+# Run data-driven CSV validator evals
+python evals/runner.py --tiers p
+
+# Run all eval tiers; PostgreSQL-backed tiers skip cleanly if PG is unavailable
+python evals/runner.py --tiers p,i,s
+
 # Manually via psql
 psql -U postgres -d te_mgmt_dev \
   --set schema_name=te_dev \
@@ -350,7 +364,7 @@ psql -U postgres -d te_mgmt_dev \
 ```
 
 ```powershell
-# Windows/PowerShell runner for Python validator tests
+# Windows/PowerShell runner for Python tests
 powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
 # Optional: run a custom test path
 powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1" -TestPath "tests/test_csv_validator.py"
@@ -360,19 +374,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
 
 - `setup.sh`, `deploy_all.sh`, and `tests/run_tests.sh` are bash scripts.
 - On Windows, run shell scripts via WSL2 or Git Bash.
-- The Python validator tests are Windows-native and do not require WSL.
-- Required for Python validator tests:
+- The Python unit tests and Tier P evals are Windows-native and do not require WSL.
+- Tier I and Tier S evals require a reachable PostgreSQL instance and `psql` on PATH; if unavailable, they skip cleanly.
+- Required for Python tests and offline evals:
   - Python on PATH (`python --version`)
   - PowerShell available (`pwsh` or `powershell`)
 - Recommended Windows command:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
+python evals\runner.py --tiers p
 ```
 
 ### CI validation (Windows)
 
-A GitHub Actions workflow is included for Windows validation of the Python validator tests:
+A GitHub Actions workflow is included for Windows validation of the Python tests:
 
 - Workflow file: `.github/workflows/python-validator-tests.yml`
 - Runner: `windows-latest`
@@ -382,6 +398,26 @@ A GitHub Actions workflow is included for Windows validation of the Python valid
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
 ```
+
+### Data-driven evals
+
+The `evals/` package complements the SQL and unit tests with scenario fixtures and expected JSON outputs.
+
+| Tier | What it validates | Database required? |
+|---|---|---|
+| P | `csv/validator.py` across 23 CSV edge cases, including malformed rows, BOM, CRLF, Unicode, quoted newlines, long fields, missing env vars, and invalid UTF-8 bytes | No |
+| I | Dev deployment idempotency by deploying twice and comparing seed row counts | Yes |
+| S | Fresh Dev deploy followed by the full SQL suite, expecting all 85 assertions to pass | Yes |
+
+Run examples:
+
+```powershell
+python evals\runner.py                  # Tier P only
+python evals\runner.py --tiers p,i,s    # all tiers; I/S skip if PostgreSQL is unavailable
+python evals\runner.py --only 14_quoted_newline --tiers p
+```
+
+Each eval run writes a JSON report under `evals/reports/<run_id>/summary.json`; that folder is intentionally gitignored.
 
 ### Coverage — 85 assertions across 5 suites
 
