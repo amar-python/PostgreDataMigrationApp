@@ -1,10 +1,14 @@
 param(
-    [string]$TestPath = "tests/test_csv_validator.py"
+    [string]$TestPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 
-python -m unittest -v $TestPath
+if ([string]::IsNullOrWhiteSpace($TestPath)) {
+    python -m unittest discover -s tests -p "test*.py" -v
+} else {
+    python -m unittest -v $TestPath
+}
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

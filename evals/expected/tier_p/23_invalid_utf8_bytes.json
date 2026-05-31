@@ -1,0 +1,12 @@
+{
+  "scenario": "23_invalid_utf8_bytes",
+  "description": "Mixed/invalid UTF-8 bytes should fail cleanly.",
+  "runner_action": "write_invalid_utf8_file",
+  "expected": {
+    "exit_code": 1,
+    "stdout_contains": [],
+    "stderr_contains": ["Unexpected error"],
+    "skip_csv_row_count": null,
+    "skip_reasons_contain": []
+  }
+}

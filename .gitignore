@@ -17,6 +17,7 @@ test_output/
 *.out
 *.log
 csv/logs/
+evals/reports/
 *_report_*.txt
 *_skipped_*.csv
 *_valid_*.csv

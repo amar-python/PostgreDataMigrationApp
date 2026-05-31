@@ -328,8 +328,8 @@ Realistic Australian T&E data is loaded automatically when `include_seed_data` i
 # Against all environments
 ./tests/run_tests.sh
 
-# Run Python validator tests
-python -m unittest -v tests/test_csv_validator.py
+# Run Python tests
+python -m unittest discover -s tests -p "test*.py" -v
 
 # Manually via psql
 psql -U postgres -d te_mgmt_dev \
