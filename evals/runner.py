@@ -99,7 +99,7 @@ def _read_csv_rows(path: Path) -> List[List[str]]:
     if not path.exists():
         return []
     with path.open("r", encoding="utf-8", newline="") as f:
-        return [row for row in csv.reader(f)]
+        return [[cell.replace("\r\n", "\n") for cell in row] for row in csv.reader(f)]
 
 
 # ---------------------------------------------------------------------------
