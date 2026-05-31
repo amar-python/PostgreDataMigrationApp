@@ -34,7 +34,6 @@ PostgreDataMigrationApp/
 └── evals/
     ├── PLAN.md                          ← this file
     ├── FAILURE_MODES.md                 ← failure-mode catalogue
-    ├── README.md                        ← how to run it
     ├── runner.py                        ← scenario discovery + diff engine + report
     │
     ├── datasets/
@@ -46,11 +45,11 @@ PostgreDataMigrationApp/
     │   │
     │   ├── tier_i/                      ← idempotency scenarios
     │   │   └── 01_deploy_dev_twice/
-    │   │       └── README.md            ← what the runner does (no CSV needed)
+    │   │       └── NOTES.txt            ← what the runner does (no CSV needed)
     │   │
     │   └── tier_s/                      ← SQL suite integration
     │       └── 01_fresh_deploy_then_all_tests_pass/
-    │           └── README.md
+    │           └── NOTES.txt
     │
     ├── expected/
     │   ├── tier_p/
@@ -112,7 +111,7 @@ Exit code: 0 if all scenarios in selected tiers pass, 1 otherwise. CI-friendly.
 
 | Phase | What | Status |
 |-------|------|--------|
-| 0 | This PLAN + FAILURE_MODES + README | **DONE** |
+| 0 | PLAN + FAILURE_MODES + root README coverage | **DONE** |
 | 1 | Tier P dataset folders (23 scenarios) + expected JSONs | DONE |
 | 2 | Tier P runner.py | DONE |
 | 3 | Execute Tier P locally; show results | DONE / awaiting your review |

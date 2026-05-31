@@ -97,8 +97,7 @@ PostgreDataMigrationApp/
 │   ├── variables.tf
 │   ├── outputs.tf
 │   ├── terraform.tfvars.example
-│   ├── .gitignore
-│   └── README.md
+│   └── .gitignore
 │
 ├── setup.sh                        ← Interactive multi-database configuration wizard
 ├── deploy_all.sh                   ← Multi-engine deployment router
@@ -203,6 +202,30 @@ LEFT   JOIN te_dev.vcrm_entries v ON v.req_id = r.req_id
 GROUP  BY r.req_identifier, r.title
 ORDER  BY r.req_identifier;
 ```
+
+---
+
+## CSV Loader
+
+`csv_loader.sh` validates CSV files, derives the target table name from the filename unless `--table` is supplied, writes accepted/skipped row outputs under `csv/logs/`, and routes valid rows to the selected engine-specific loader.
+
+```bash
+# Load into the engine from config.local.env
+./csv_loader.sh data/customers.csv
+
+# Specify engine/environment
+./csv_loader.sh data/orders.csv --engine postgresql --env dev
+
+# Validate only
+./csv_loader.sh data/products.csv --engine sqlite --dry-run
+
+# Override the target table name
+./csv_loader.sh data/export_2025.csv --engine mariadb --table invoices
+```
+
+CSV inputs must have a header row, use comma delimiters, and be UTF-8 encoded with or without a BOM. The shared Python validator skips empty rows and row/header column-count mismatches, warns on duplicate headers, preserves quoted commas/newlines, and writes rejected rows with an `_skip_reason` column.
+
+Supported loader backends are PostgreSQL, MariaDB/MySQL, SQLite, InfluxDB, Redis, and Teradata. PostgreSQL uses `COPY`, MariaDB/MySQL uses `LOAD DATA LOCAL INFILE`, SQLite uses Python `csv` + `sqlite3`, InfluxDB writes line protocol via the `influx` CLI, Redis writes hashes through `redis-cli`, and Teradata uses BTEQ/FastLoad tooling.
 
 ---
 

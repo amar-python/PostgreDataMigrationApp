@@ -9,12 +9,12 @@
 |--------------|-----------|
 | `evals/PLAN.md` | Scope, folder layout, tiering, phases |
 | `evals/FAILURE_MODES.md` | 29 catalogued failure modes; all 22 Tier P modes now covered |
-| `evals/README.md` | How to run; CLI flags; exit codes |
+| root `README.md` + `evals/USAGE.md` | How to run; CLI flags; exit codes |
 | `evals/runner.py` | Single-file scenario discovery + diff engine + JSON report writer (606 lines) |
 | `evals/datasets/tier_p/01-23/` | 23 CSV scenarios (happy + empty + malformed + unicode + generated edge cases) |
-| `evals/datasets/tier_i/01_deploy_dev_twice/` | Idempotency scenario (README only — runner drives the work) |
+| `evals/datasets/tier_i/01_deploy_dev_twice/` | Idempotency scenario (NOTES only; runner drives the work) |
 | `evals/datasets/tier_s/01_fresh_deploy_then_all_tests_pass/` | SQL-suite integration scenario |
-| `evals/expected/tier_p/*.json` | 20 expected-outcome files |
+| `evals/expected/tier_p/*.json` | 23 expected-outcome files |
 | `evals/expected/tier_i/01_deploy_dev_twice.json` | Expected outcome (exit codes + row-count parity) |
 | `evals/expected/tier_s/01_fresh_deploy_then_all_tests_pass.json` | Expected outcome (85/85 + ALL TESTS PASSED) |
 | `evals/reports/` | Auto-created at runtime; one folder per run with `summary.json` |
@@ -38,7 +38,7 @@ cd "$env:USERPROFILE\OneDrive\Desktop\Migration using ai\PostgreDataMigrationApp
 python evals\runner.py
 ```
 
-Expect: `total: 20, passed: 20, failed: 0, skipped: 0` and exit code 0.
+Expect: `total: 23, passed: 23, failed: 0, skipped: 0` and exit code 0.
 
 ### 2. Run Tier I + S against your local PostgreSQL
 
@@ -107,11 +107,11 @@ Catalogued in `FAILURE_MODES.md` so they're not lost.
 
 | Category | Count |
 |----------|-------|
-| Markdown docs (PLAN, FAILURE_MODES, README, HANDOFF) | 4 |
+| Markdown docs (root README, PLAN, FAILURE_MODES, USAGE, HANDOFF) | 5 |
 | Python (`runner.py`) | 1 |
 | CSV input fixtures | 20 (scenarios 19, 20, 22, and 23 are generated/no-input scenarios) |
 | Expected JSON files | 25 |
-| Scenario README/TXT files | 4 |
+| Scenario note/TXT files | 4 |
 | **Total files created** | **55** |
 
 ## Open items

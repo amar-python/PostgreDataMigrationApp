@@ -2,7 +2,7 @@
 
 End-to-end instructions for running, interpreting, and extending the
 `PostgreDataMigrationApp/evals/` suite. If you only need the 30-second
-quick start, see `README.md`. For the architectural rationale, see
+quick start, see the root `../README.md`. For the architectural rationale, see
 `PLAN.md`. For the catalogue of what's covered, see `FAILURE_MODES.md`.
 
 ---
@@ -209,7 +209,7 @@ python ..\evals\runner.py --only 21_rtl_arabic
 
 These need a runner branch because each scenario does different work (deploy, count rows, run suite, etc.).
 
-1. Create `datasets/tier_i/<NN_name>/README.md` describing the action.
+1. Create `datasets/tier_i/<NN_name>/NOTES.txt` describing the action.
 2. Create `expected/tier_i/<NN_name>.json` declaring the expected outcome.
 3. Open `runner.py` → find `run_tier_i_scenario` (or `run_tier_s_scenario`).
 4. Add an `if name == "<NN_name>": return _run_<name>(result, expected)` branch.
@@ -291,15 +291,14 @@ PostgreDataMigrationApp/
 └── evals/
     ├── PLAN.md              ← architecture and tiering
     ├── FAILURE_MODES.md     ← 29 catalogued failure modes
-    ├── README.md            ← 30-second quick start
     ├── USAGE.md             ← this file
     ├── HANDOFF.md           ← what was delivered + next steps
     ├── runner.py            ← orchestrator (606 lines, stdlib only)
     │
     ├── datasets/
     │   ├── tier_p/<NN_name>/input.csv      (or README.txt for env-var-only scenarios)
-    │   ├── tier_i/<NN_name>/README.md
-    │   └── tier_s/<NN_name>/README.md
+    │   ├── tier_i/<NN_name>/NOTES.txt
+    │   └── tier_s/<NN_name>/NOTES.txt
     │
     ├── expected/
     │   ├── tier_p/<NN_name>.json
