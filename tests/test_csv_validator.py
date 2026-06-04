@@ -1,3 +1,9 @@
+"""Tests for build/csv/validator.py.
+
+Runs the validator as a subprocess via environment-variable injection
+(CSV_FILE, VALID_CSV, SKIP_FILE). No database required; all tests are
+self-contained using tempfile directories.
+"""
 import os
 import subprocess
 import sys
@@ -8,7 +14,7 @@ from pathlib import Path
 
 class CsvValidatorTests(unittest.TestCase):
     def setUp(self):
-        self.validator = Path(__file__).resolve().parents[1] / "csv" / "validator.py"
+        self.validator = Path(__file__).resolve().parents[1] / "build" / "csv" / "validator.py"
 
     def run_validator(self, env):
         result = subprocess.run(
@@ -20,6 +26,7 @@ class CsvValidatorTests(unittest.TestCase):
         return result
 
     def test_fails_when_required_env_vars_missing(self):
+        """When CSV_FILE/VALID_CSV/SKIP_FILE are absent, the validator should exit 1 with 'Missing required environment variables' on stderr."""
         env = os.environ.copy()
         env.pop("CSV_FILE", None)
         env.pop("VALID_CSV", None)
@@ -29,6 +36,7 @@ class CsvValidatorTests(unittest.TestCase):
         self.assertIn("Missing required environment variables", result.stderr)
 
     def test_fails_when_csv_file_missing(self):
+        """When CSV_FILE points to a non-existent path, the validator should exit 1 with 'CSV file not found' on stderr."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             env = os.environ.copy()
@@ -40,6 +48,7 @@ class CsvValidatorTests(unittest.TestCase):
             self.assertIn("CSV file not found", result.stderr)
 
     def test_splits_valid_and_skipped_rows(self):
+        """Given a 4-row CSV (2 valid, 1 empty row, 1 column-mismatch), valid.csv gets the 2 good rows and skip.csv gets 2 annotated rows with a _skip_reason column."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             csv_file = tmp_path / "input.csv"
@@ -65,6 +74,7 @@ class CsvValidatorTests(unittest.TestCase):
             self.assertIn("column mismatch", skip_lines[2])
 
     def test_returns_error_when_no_valid_rows(self):
+        """When all data rows are invalid, the validator should exit 1 with 'No valid rows found' on stderr."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             csv_file = tmp_path / "input.csv"

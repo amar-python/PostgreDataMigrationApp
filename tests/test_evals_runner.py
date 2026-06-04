@@ -1,3 +1,10 @@
+"""Unit tests for evals/runner.py.
+
+Imports the runner module directly via importlib. Covers scenario discovery,
+expected-file loading, tier_p/tier_i execution, row counting, and psql
+availability. Most tests need no database; tier_i skip behaviour is verified
+by mocking _can_connect_pg.
+"""
 import importlib.util
 import shutil
 import tempfile
@@ -17,13 +24,16 @@ spec.loader.exec_module(runner)
 
 class EvalsRunnerTests(unittest.TestCase):
     def test_load_expected_returns_none_for_missing_scenario(self):
+        """_load_expected with an unknown scenario name should return None without raising."""
         self.assertIsNone(runner._load_expected("p", "does_not_exist"))
 
     def test_discover_scenarios_filters_only_requested_name(self):
+        """discover_scenarios with a name argument should return only the directory whose name matches exactly."""
         scenarios = runner.discover_scenarios("p", "01_happy_path")
         self.assertEqual([p.name for p in scenarios], ["01_happy_path"])
 
     def test_tier_p_reports_unknown_runner_action_as_failure(self):
+        """An expected JSON with an unrecognised runner_action should produce a failed result containing 'Unknown runner_action' in errors."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             scenario = tmp_path / "01_bad_action"
@@ -42,6 +52,7 @@ class EvalsRunnerTests(unittest.TestCase):
         self.assertIn("Unknown runner_action", result.errors[0])
 
     def test_tier_p_generated_invalid_utf8_fails_cleanly(self):
+        """The 23_invalid_utf8_bytes eval scenario should produce exit_code=1 with 'Unexpected error' in stderr and no raw Traceback."""
         scenario = PROJECT_ROOT / "evals" / "datasets" / "tier_p" / "23_invalid_utf8_bytes"
         result = runner.run_tier_p_scenario(scenario)
 
@@ -51,6 +62,7 @@ class EvalsRunnerTests(unittest.TestCase):
         self.assertNotIn("Traceback", result.actual["stderr"])
 
     def test_tier_i_skips_when_postgresql_is_unavailable(self):
+        """When _can_connect_pg returns False, run_tier_i_scenario should mark the result as skipped with 'PostgreSQL not reachable'."""
         scenario = PROJECT_ROOT / "evals" / "datasets" / "tier_i" / "01_deploy_dev_twice"
 
         with mock.patch.object(runner, "_can_connect_pg", return_value=False):
@@ -61,6 +73,7 @@ class EvalsRunnerTests(unittest.TestCase):
         self.assertIn("PostgreSQL not reachable", result.errors[0])
 
     def test_count_dev_rows_records_none_for_failed_count_query(self):
+        """When the count query subprocess exits non-zero, _count_dev_rows should record None for every entry in DEV_SEED_TABLES."""
         fake_cp = mock.Mock(returncode=1, stdout="", stderr="relation missing")
 
         with mock.patch.object(runner.subprocess, "run", return_value=fake_cp):
@@ -70,6 +83,7 @@ class EvalsRunnerTests(unittest.TestCase):
         self.assertTrue(all(value is None for value in counts.values()))
 
     def test_have_psql_uses_path_lookup(self):
+        """When shutil.which returns None, _have_psql should return False."""
         with mock.patch.object(shutil, "which", return_value=None):
             self.assertFalse(runner._have_psql())
 
