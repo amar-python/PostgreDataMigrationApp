@@ -221,13 +221,13 @@ These need a runner branch because each scenario does different work (deploy, co
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| Exit code 2 + `csv/validator.py not found at ...` | Running from the wrong directory | `cd PostgreDataMigrationApp` first |
+| Exit code 2 + `build/csv/validator.py not found at ...` | Running from the wrong directory | `cd PostgreDataMigrationApp` first |
 | Every Tier P scenario fails with `No expected file at expected/tier_p/...` | The `expected/tier_p/` folder structure doesn't match `datasets/tier_p/` | Filenames must match (folder name = expected JSON filename without extension) |
 | Tier I + S always SKIP | `psql` not on PATH, or no PG instance reachable | Run `psql -c "SELECT 1"` standalone — if that doesn't return `1`, fix that first |
 | Tier S fails with `total_assertions: expected >= 85, got None` | The suite output doesn't match the regex the runner uses to parse the totals line | Open `summary.json` → look at `actual.stdout_tail` to see what was actually printed; adjust either the suite's output format or the parser in `_run_fresh_deploy_then_tests` |
 | Tier I fails with `row counts changed between runs: {table_name: (n1, n2)}` | A seed INSERT in `env_dev.sql` (or one of its includes) isn't using `ON CONFLICT DO NOTHING` — the eval just caught a real idempotency bug | Fix the seed script; re-run |
 | Encoding garbled in terminal (mojibake on emoji / CJK) | Windows console using cp1252 | Set `$env:PYTHONIOENCODING = 'utf-8'`, or use Windows Terminal (which defaults to UTF-8) |
-| Tier I times out after 120 s | Deploy script is hanging on a prompt (e.g. `\set` asking for a value) | Make sure `environments/env_dev.sql` has no interactive prompts; check `actual.stderr` in the report |
+| Tier I times out after 120 s | Deploy script is hanging on a prompt (e.g. `\set` asking for a value) | Make sure `build/environments/env_dev.sql` has no interactive prompts; check `actual.stderr` in the report |
 | `SyntaxError: unterminated string literal` when running runner.py | You're on Python <3.10 | Upgrade to Python 3.10+. The runner uses syntax that requires it. |
 
 ---

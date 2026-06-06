@@ -40,71 +40,80 @@ All names (database, schema, users, every table) are controlled by a single `\se
 
 ## Repository Structure
 
+The project is organised into three categories: `build/` (everything that ships), `tests/` (correctness coverage), `evals/` (data-driven black-box scenarios). See **`ARCHITECTURE.md`** for the rationale.
+
 ```
 PostgreDataMigrationApp/
 │
-├── te_core_schema.sql              ← PostgreSQL master schema (legacy entry point)
+├── build/                             ← everything that ships
+│   ├── te_core_schema.sql             ← PostgreSQL master schema (legacy entry point)
+│   ├── te_seed_data.sql               ← Seed data
+│   │
+│   ├── adapters/                      ← Engine-specific deployment adapters
+│   │   ├── adapter_postgresql.sh
+│   │   ├── adapter_mariadb.sh
+│   │   ├── adapter_sqlite.sh
+│   │   ├── adapter_influxdb.sh
+│   │   ├── adapter_redis.sh
+│   │   └── adapter_teradata.sh
+│   │
+│   ├── csv/                           ← Python validator + per-engine loaders
+│   │   ├── validator.py
+│   │   ├── validator.sh
+│   │   └── loader_<engine>.sh
+│   │
+│   ├── schema/                        ← Engine-specific DDL and seed data
+│   │   ├── postgresql/
+│   │   │   └── te_core_schema.sql
+│   │   ├── mariadb/
+│   │   │   └── te_core_schema.sql
+│   │   ├── sqlite/
+│   │   │   └── te_core_schema.sql
+│   │   ├── influxdb/
+│   │   │   └── te_seed_data.lp
+│   │   ├── redis/
+│   │   │   └── te_seed_data.sh
+│   │   └── teradata/
+│   │       ├── te_core_schema.sql
+│   │       └── te_seed_data.sql
+│   │
+│   ├── environments/                  ← PostgreSQL per-environment launchers
+│   │   ├── env_dev.sql
+│   │   ├── env_test.sql
+│   │   ├── env_staging.sql
+│   │   └── env_prod.sql
+│   │
+│   ├── terraform-github-repos/        ← GitHub repos as Infrastructure as Code
+│   │
+│   ├── setup.sh                       ← Interactive multi-database configuration wizard
+│   └── deploy_all.sh                  ← Multi-engine deployment router
 │
-├── adapters/                       ← Engine-specific deployment adapters
-│   ├── adapter_postgresql.sh       ← PostgreSQL 15 adapter
-│   ├── adapter_mariadb.sh          ← MariaDB / MySQL adapter
-│   ├── adapter_sqlite.sh           ← SQLite 3 adapter
-│   ├── adapter_influxdb.sh         ← InfluxDB 2.x adapter
-│   ├── adapter_redis.sh            ← Redis 7.x adapter
-│   └── adapter_teradata.sh         ← Teradata Vantage adapter
-│
-├── schema/                         ← Engine-specific DDL and seed data
-│   ├── postgresql/
-│   │   └── te_core_schema.sql      ← PostgreSQL DDL (uuid-ossp, pg_trgm, triggers)
-│   ├── mariadb/
-│   │   └── te_core_schema.sql      ← MariaDB DDL (InnoDB, ENUM, ON UPDATE)
-│   ├── sqlite/
-│   │   └── te_core_schema.sql      ← SQLite DDL (WAL, CHECK constraints, triggers)
-│   ├── influxdb/
-│   │   └── te_seed_data.lp         ← InfluxDB line protocol seed data
-│   ├── redis/
-│   │   └── te_seed_data.sh         ← Redis HSET/SADD seed data script
-│   └── teradata/
-│       ├── te_core_schema.sql      ← Teradata DDL (SET TABLE, PRIMARY INDEX, BTEQ)
-│       └── te_seed_data.sql        ← Teradata seed data (BTEQ INSERT statements)
-│
-├── environments/                   ← PostgreSQL per-environment launchers (legacy)
-│   ├── env_dev.sql
-│   ├── env_test.sql
-│   ├── env_staging.sql
-│   └── env_prod.sql
-│
-├── tests/
+├── tests/                             ← correctness coverage for build/
 │   ├── framework/
-│   │   └── test_framework.sql      ← Assertion library + results table
+│   │   └── test_framework.sql         ← Assertion library + results table
 │   ├── suites/
 │   │   ├── test_01_organisations_personnel.sql
 │   │   ├── test_02_programs_phases.sql
 │   │   ├── test_03_requirements_vcrm.sql
 │   │   ├── test_04_execution_defects.sql
 │   │   └── test_05_schema_and_business_rules.sql
-│   ├── run_all_tests.sql           ← Master test orchestrator
-│   └── run_tests.sh                ← Bash wrapper (reads config.local.env)
+│   ├── run_all_tests.sql              ← Master SQL test orchestrator
+│   ├── run_tests.sh                   ← Bash wrapper (reads config.local.env)
+│   ├── run_python_tests.ps1           ← Windows test runner (CI)
+│   ├── test_csv_validator.py          ← unittest for build/csv/validator.py
+│   └── test_evals_runner.py           ← unittest for evals/runner.py
 │
-├── evals/                         ← Data-driven operational evals
-│   ├── runner.py                  ← Scenario discovery, diff engine, JSON reports
-│   ├── datasets/tier_p/           ← 23 offline CSV validator scenarios
-│   ├── expected/tier_p/           ← Expected outputs for validator evals
-│   └── reports/                   ← Generated reports (gitignored)
+├── evals/                             ← data-driven black-box scenarios
+│   ├── PLAN.md  USAGE.md  FAILURE_MODES.md  README.md  HANDOFF.md
+│   ├── runner.py                      ← Scenario discovery, diff engine, JSON reports
+│   ├── datasets/tier_p/               ← 23 offline CSV validator scenarios
+│   ├── datasets/tier_i/               ← Idempotency scenarios (needs PG)
+│   ├── datasets/tier_s/               ← SQL suite integration scenarios
+│   ├── expected/tier_*/               ← Expected outcomes
+│   └── reports/                       ← Runtime output (gitignored)
 │
-├── terraform-github-repos/         ← GitHub repos as Infrastructure as Code
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── outputs.tf
-│   ├── terraform.tfvars.example
-│   └── .gitignore
-│
-├── setup.sh                        ← Interactive multi-database configuration wizard
-├── deploy_all.sh                   ← Multi-engine deployment router
-├── config.env                      ← Central config template (all engines)
-├── .gitignore
-├── LICENSE
-└── README.md
+├── ARCHITECTURE.md                    ← The three-layer model
+├── README.md  LICENSE  .gitignore
 ```
 
 ---
@@ -141,6 +150,7 @@ cd PostgreDataMigrationApp
 ### 2. Run the interactive setup wizard
 
 ```bash
+cd build
 chmod +x setup.sh
 ./setup.sh
 ```
@@ -175,11 +185,11 @@ Or skip the wizard and accept all defaults:
 
 ```bash
 # Dev only (includes realistic seed data)
-psql -U postgres -f environments/env_dev.sql
+psql -U postgres -f build/environments/env_dev.sql
 
 # Or deploy all 4 environments at once
-chmod +x deploy_all.sh
-./deploy_all.sh
+chmod +x build/deploy_all.sh
+./build/deploy_all.sh
 ```
 
 ### 3. Run the test suite
@@ -269,7 +279,7 @@ Each environment is fully isolated. All four can run on the same PostgreSQL inst
 
 To deploy to a remote host:
 ```bash
-PGHOST=my-db-server PGPORT=5432 PGUSER=postgres ./deploy_all.sh staging
+PGHOST=my-db-server PGPORT=5432 PGUSER=postgres ./build/deploy_all.sh staging
 ```
 
 ---

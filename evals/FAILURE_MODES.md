@@ -9,9 +9,9 @@ Legend:
 
 ---
 
-## Tier P — Python CSV validator (`csv/validator.py`)
+## Tier P — Python CSV validator (`build/csv/validator.py`)
 
-These run without any database. Driven by `evals/runner.py` against the actual `csv/validator.py` script as a subprocess.
+These run without any database. Driven by `evals/runner.py` against the actual `build/csv/validator.py` script as a subprocess.
 
 | # | Failure mode | Example input | Expected behaviour | Current | Eval ID |
 |---|--------------|--------------|--------------------|---------|---------|

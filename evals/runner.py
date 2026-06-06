@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 EVALS_DIR    = Path(__file__).resolve().parent
 PROJECT_ROOT = EVALS_DIR.parent
-VALIDATOR    = PROJECT_ROOT / "csv" / "validator.py"
+VALIDATOR    = PROJECT_ROOT / "build" / "csv" / "validator.py"
 
 DATASETS_DIR = EVALS_DIR / "datasets"
 EXPECTED_DIR = EVALS_DIR / "expected"
@@ -349,7 +349,7 @@ def run_tier_i_scenario(scenario_dir: Path) -> ScenarioResult:
 def _run_deploy_dev_twice(
     result: ScenarioResult, expected: Dict[str, Any]
 ) -> ScenarioResult:
-    env_dev_sql = PROJECT_ROOT / "environments" / "env_dev.sql"
+    env_dev_sql = PROJECT_ROOT / "build" / "environments" / "env_dev.sql"
     if not env_dev_sql.exists():
         result.errors.append("Cannot find " + str(env_dev_sql))
         return result
@@ -439,7 +439,7 @@ def run_tier_s_scenario(scenario_dir: Path) -> ScenarioResult:
 def _run_fresh_deploy_then_tests(
     result: ScenarioResult, expected: Dict[str, Any]
 ) -> ScenarioResult:
-    env_dev_sql = PROJECT_ROOT / "environments" / "env_dev.sql"
+    env_dev_sql = PROJECT_ROOT / "build" / "environments" / "env_dev.sql"
     run_tests   = PROJECT_ROOT / "tests" / "run_all_tests.sql"
     if not env_dev_sql.exists() or not run_tests.exists():
         result.errors.append(
@@ -567,7 +567,7 @@ def main() -> int:
             return 2
 
     if not VALIDATOR.exists():
-        print(_fail("csv/validator.py not found at " + str(VALIDATOR)))
+        print(_fail("build/csv/validator.py not found at " + str(VALIDATOR)))
         return 2
 
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:6]
@@ -624,6 +624,16 @@ def main() -> int:
     with summary_path.open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
     print("\n  report:  " + str(summary_path))
+
+    # Per-run VCRM gap report (see gap_report.py for the BR catalogue).
+    # Best-effort: never fail the run if the report can't be generated.
+    try:
+        sys.path.insert(0, str(EVALS_DIR))
+        import gap_report
+        gap_path = gap_report.generate_for_run(run_dir, summary_path)
+        print("  gap report: " + str(gap_path))
+    except Exception as exc:  # noqa: BLE001
+        print("  gap report skipped: " + type(exc).__name__ + ": " + str(exc))
 
     return 0 if failed == 0 else 1
 

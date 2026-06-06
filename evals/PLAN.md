@@ -19,7 +19,7 @@ In short: `tests/` proves the **code is correct**; `evals/` proves the **framewo
 - **Database engine:** PostgreSQL only.
   - MariaDB / SQLite / InfluxDB / Redis / Teradata adapters are deliberately out of scope until Postgres evals are stable. The eval structure is engine-agnostic so they can be added later.
 - **Tiers in scope:**
-  - **Tier P** — Python CSV validator (`csv/validator.py`). Pure data-in / files-out. No DB.
+  - **Tier P** — Python CSV validator (`build/csv/validator.py`). Pure data-in / files-out. No DB.
   - **Tier I** — Idempotency of `deploy_all.sh` against a clean Dev PostgreSQL.
   - **Tier S** — SQL test suite integration: deploy fresh + run all 5 suites and assert 85/85.
 - **Tiers deferred:**
@@ -95,7 +95,7 @@ Each `expected/<tier>/<scenario>.json` declares what the runner should see. Only
 `runner.py`:
 
 1. Discovers every folder under `datasets/<tier>/`.
-2. For Tier P: copies the scenario's `input.csv` to a temp file, sets env vars, runs `python3 csv/validator.py`, captures exit + stdout + stderr + output files, diffs against `expected/<tier>/<scenario>.json`.
+2. For Tier P: copies the scenario's `input.csv` to a temp file, sets env vars, runs `python3 build/csv/validator.py`, captures exit + stdout + stderr + output files, diffs against `expected/<tier>/<scenario>.json`.
 3. For Tier I and Tier S: runs the orchestration script (`deploy_all.sh dev`, `tests/run_tests.sh dev`) and asserts the documented outcomes.
 4. Prints one line per scenario: `PASS / FAIL / SKIPPED`.
 5. Writes per-tier and overall JSON summaries under `reports/<run_id>/`.

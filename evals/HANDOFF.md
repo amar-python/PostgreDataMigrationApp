@@ -23,7 +23,7 @@
 
 | Tier | Result | Notes |
 |------|--------|-------|
-| **P** (23 scenarios) | **23 PASS / 0 FAIL** | Executed locally against the real `csv/validator.py` |
+| **P** (23 scenarios) | **23 PASS / 0 FAIL** | Executed locally against the real `build/csv/validator.py` |
 | **I** (1 scenario)   | **SKIP** | No PostgreSQL in the sandbox — clean skip with diagnostic |
 | **S** (1 scenario)   | **SKIP** | Same |
 
