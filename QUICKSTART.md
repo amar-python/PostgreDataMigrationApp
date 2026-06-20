@@ -132,7 +132,25 @@ Each run gets a timestamped folder under `evals\reports\`. The pattern is
 - **Tier S row-count drift** — check `actual.row_counts_first` vs
   `actual.row_counts_second` in `summary.json` to pinpoint the table whose
   seed inserts are missing `ON CONFLICT DO NOTHING`
+### Checking PostgreSQL is running and reachable
 
+If connections fail, confirm the service is up and listening on port 5432:
+
+```powershell
+# Windows
+Get-Service postgresql*
+Test-NetConnection -ComputerName localhost -Port 5432
+```
+
+```bash
+# Linux (systemd)
+sudo systemctl status postgresql
+ss -ltnp | grep 5432
+
+# macOS
+brew services list
+lsof -iTCP:5432 -sTCP:LISTEN
+```
 ## Next steps
 
 - Read `evals\USAGE.md` for runner flags and CI integration
