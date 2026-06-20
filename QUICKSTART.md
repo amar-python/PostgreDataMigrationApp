@@ -32,9 +32,11 @@ $env:PGPORT     = '5432'
 $env:PGUSER     = 'postgres'
 $env:PGPASSWORD = '<your password>'
 ```
+>
 > **Security note:** Never commit credentials. `PGPASSWORD` lives only in the
 > current session — close the terminal to clear it. If you instead keep settings
 > in a `config.local.env` file, ensure it is gitignored and, on Mac/Linux,
+>
 > restrict its permissions so only you can read it:
 >
 > ```bash
@@ -131,7 +133,7 @@ Each run gets a timestamped folder under `evals\reports\`. The pattern is
   before rerunning
 - **Tier S row-count drift** — check `actual.row_counts_first` vs
   `actual.row_counts_second` in `summary.json` to pinpoint the table whose
-  seed inserts are missing `ON CONFLICT DO NOTHING`
+  
 ### Checking PostgreSQL is running and reachable
 
 If connections fail, confirm the service is up and listening on port 5432:
@@ -151,6 +153,7 @@ ss -ltnp | grep 5432
 brew services list
 lsof -iTCP:5432 -sTCP:LISTEN
 ```
+
 ## Next steps
 
 - Read `evals\USAGE.md` for runner flags and CI integration
