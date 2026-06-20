@@ -32,6 +32,17 @@ $env:PGPORT     = '5432'
 $env:PGUSER     = 'postgres'
 $env:PGPASSWORD = '<your password>'
 ```
+> **Security note:** Never commit credentials. `PGPASSWORD` lives only in the
+> current session — close the terminal to clear it. If you instead keep settings
+> in a `config.local.env` file, ensure it is gitignored and, on Mac/Linux,
+> restrict its permissions so only you can read it:
+>
+> ```bash
+> chmod 600 config.local.env
+> ```
+>
+> For unattended use, a [`~/.pgpass`](https://www.postgresql.org/docs/current/libpq-pgpass.html)
+> file (chmod `600`) avoids putting the password in environment variables at all.
 
 ## Deploy the Dev environment
 
