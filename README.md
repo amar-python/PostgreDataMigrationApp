@@ -138,6 +138,59 @@ PostgreDataMigrationApp/
 
 ---
 
+## Verify Before You Deploy
+
+Before running any deployment — local or Azure — confirm your environment is
+ready. This repository has evolved over time, so always verify which files and
+tools are actually present rather than assuming.
+
+### 1. Confirm the required tools are installed
+
+```powershell
+az version          # Azure CLI (only needed for Azure deployment)
+terraform version   # Terraform 1.5+
+psql --version      # PostgreSQL client
+python --version    # Python 3.10+
+```
+
+If any command is not recognised, install that tool before continuing. On
+Windows, add `psql` to PATH permanently:
+
+```powershell
+setx PATH "$($env:PATH);C:\Program Files\PostgreSQL\17\bin"
+```
+
+### 2. Locate the deployment scripts actually present in your copy
+
+```powershell
+Get-ChildItem -Recurse -Filter "deploy-all.ps1" | Select-Object FullName
+Get-ChildItem -Recurse -Filter "main.tf"        | Select-Object FullName
+Get-ChildItem -Recurse -Filter "deploy_all.sh"  | Select-Object FullName
+```
+
+Use the paths these return — do not assume a folder name. Azure automation may
+live under `azure-automation/` or `infra/` depending on your version.
+
+### 3. Confirm PostgreSQL is reachable (before DB-backed steps)
+
+```powershell
+psql -c '\l'
+```
+
+If this fails, local deploys and Tiers I + S of the eval suite will skip — the
+database must be installed and running first.
+
+### 4. Confirm no secrets are tracked
+
+```powershell
+git ls-files | Select-String -Pattern "config.local.env$|\.tfvars$|\.pgpass"
+```
+
+This should return nothing. If it lists a file, remove it from tracking before
+pushing.
+
+---
+
 ## Quick Start
 
 ### 1. Clone the repository
