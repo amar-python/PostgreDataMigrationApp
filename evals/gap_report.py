@@ -383,7 +383,7 @@ def generate_markdown(summary: Dict[str, Any]) -> str:
         for br, st in regressions:
             lines.append("- **" + br["id"] + "** " + br["title"])
             for d in st["details"]:
-                lines.append("    - " + d)
+                lines.append("  - " + d)
         lines.append("")
 
     if unverified:
@@ -391,7 +391,7 @@ def generate_markdown(summary: Dict[str, Any]) -> str:
         lines.append("")
         for br, st in unverified:
             lines.append("- **" + br["id"] + "** " + br["title"])
-            lines.append("    - " + br.get("notes", ""))
+            lines.append("  - " + br.get("notes", ""))
         lines.append("")
 
     if skipped:
@@ -416,7 +416,8 @@ def generate_markdown(summary: Dict[str, Any]) -> str:
     lines.append("---")
     lines.append("")
     lines.append("Companion: `VCRM.md` (catalogue), `VCRM_GAPS.md` (static gap analysis), `TEST_CONDITIONS.md` (every test).")
-    return "\n".join(lines)
+    # Ensure a single trailing newline so markdownlint MD047 passes.
+    return "\n".join(lines) + "\n"
 
 
 # --------------------------------------------------------------------------

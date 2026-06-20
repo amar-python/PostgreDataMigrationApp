@@ -56,6 +56,7 @@ Recommended remediation priority across the 3 actionable gaps (excluding the 2 d
 
 1. Create `evals/datasets/tier_e/01_envs_have_identical_structure/NOTES.md`.
 2. Create `evals/expected/tier_e/01_envs_have_identical_structure.json` declaring:
+
    ```json
    {
      "envs_under_test": ["dev", "test", "staging", "prod"],
@@ -66,6 +67,7 @@ Recommended remediation priority across the 3 actionable gaps (excluding the 2 d
      }
    }
    ```
+
 3. Add a runner branch `_run_envs_have_identical_structure` that:
    - Deploys all 4 envs (or skips if PG unavailable).
    - For each env, queries `information_schema.columns` filtered to its schema.
@@ -236,7 +238,7 @@ When any of the following happen:
 
 If you wanted to close all three actionable gaps in one mini-sprint, the sequence and total cost are:
 
-```
+```text
 Day 0.1  BR-15: add 4 conn_limit assertions to tests/suites/test_05_*.sql      (~1 hour)
 Day 1    BR-01: scaffold Tier E + 01_envs_have_identical_structure scenario   (~1 day)
 Day 2    BR-02: scaffold Tier X + 01_sqlite_fresh_deploy scenario              (~1 day)
@@ -264,8 +266,9 @@ Append to this log whenever a gap is accepted as risk, scheduled for verificatio
 ---
 
 *Companion documents:*
+
 - `VCRM.md` — full Verification Cross Reference Matrix (all 22 requirements)
 - `TEST_CONDITIONS.md` — every test condition catalogued in detail
 - `ARCHITECTURE.md` — the three-layer model (build / tests / evals)
 - `evals/FAILURE_MODES.md` — failure-mode catalogue at the eval layer
-- `evals/HANDOFF.md` — deferred-items log for the eval package
+- `evals/HANDOFF.md` — deferred-items log for the eval pa

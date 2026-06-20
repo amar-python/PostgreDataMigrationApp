@@ -76,7 +76,7 @@ python evals\runner.py --tiers p,i --only 01_happy_path --verbose
 
 Each scenario prints one line:
 
-```
+```text
 PASS tier_p/01_happy_path
 FAIL tier_p/05_mixed_valid_skipped
      exit_code: expected 0, got 1
@@ -90,7 +90,7 @@ Then a final summary block with totals.
 
 Every run writes:
 
-```
+```text
 evals\reports\<run_id>\summary.json
 ```
 
@@ -147,7 +147,7 @@ notepad datasets\tier_p\21_rtl_arabic\input.csv
 
 `input.csv`:
 
-```
+```csv
 id,name
 1,محمد علي
 2,فاطمة
@@ -286,7 +286,7 @@ jobs:
 
 ## 7. Where everything lives
 
-```
+```text
 PostgreDataMigrationApp/
 └── evals/
     ├── PLAN.md              ← architecture and tiering
@@ -305,5 +305,4 @@ PostgreDataMigrationApp/
     │   ├── tier_i/<NN_name>.json
     │   └── tier_s/<NN_name>.json
     │
-    └── reports/<run_id>/summary.json       ← generated at runtime
-```
+    └── reports/<run_id>/summary.json       ← generated at

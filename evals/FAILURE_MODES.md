@@ -3,6 +3,7 @@
 Each row is a real-world data or operational scenario that *could* break the framework. For each: a concrete example, the **expected** behaviour, and the eval scenario number that proves it.
 
 Legend:
+
 - ✅ **handles correctly** — framework already produces the right outcome
 - ⚠️ **partial** — works but not asserted by an eval today
 - ❌ **gap** — silently accepts, crashes, or fails noisily without a clean signal
@@ -26,8 +27,8 @@ These run without any database. Driven by `evals/runner.py` against the actual `
 | P9 | Row with fewer fields than header | header has 3, row has 2 | row skipped as "column mismatch" | ✅ | 07 |
 | P10 | Row with more fields than header | header has 2, row has 3 | row skipped as "column mismatch" | ✅ | 07b |
 | P11 | Duplicate column names | `id,id,name\n…` | exit 0 but stdout contains "Duplicate column names" warning | ✅ | 06 |
-| P12 | Leading/trailing whitespace in headers | ` id , name \n…` | headers normalised to `id`, `name` (stripped) | ✅ | 17 |
-| P13 | UTF-8 BOM at start of file | `﻿id,name\n…` | BOM stripped (file opened with `utf-8-sig`); behaves as if no BOM | ✅ | 09 |
+| P12 | Leading/trailing whitespace in headers | header `id,name` with surrounding spaces | headers normalised to `id`, `name` (stripped) | ✅ | 17 |
+| P13 | UTF-8 BOM at start of file | U+FEFF byte then `id,name\n…` | BOM stripped (file opened with `utf-8-sig`); behaves as if no BOM | ✅ | 09 |
 | P14 | UTF-8 emoji in value | `1,Alice 👋` | preserved through; row valid | ✅ | 10 |
 | P15 | UTF-8 CJK characters | `1,田中花子` | preserved through; row valid | ✅ | 18 |
 | P16 | CRLF line endings | `id,name\r\n1,Alice\r\n` | csv module handles natively; row valid | ✅ | 11 |
@@ -86,4 +87,4 @@ Tier S initial scope: only S1.
 | S | 3 | 1 | 2 |
 | **Total** | **29** | **21** | **7** |
 
-The current eval set covers every catalogued Tier P mode plus the initial Tier I and Tier S operational scenarios. The remaining deferred items are PostgreSQL operational and cross-engine scenarios.
+The current eval set covers every catalogued Tier P mode plus the initial Tier I and Tier S operational scenarios. The remaining deferred items are PostgreSQL oper

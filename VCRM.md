@@ -189,6 +189,7 @@ This VCRM was derived as follows:
 ---
 
 *Companion documents:*
+
 - `ARCHITECTURE.md` — the three-layer model (build / tests / evals)
 - `TEST_CONDITIONS.md` — every test condition catalogued in full detail
 - `evals/FAILURE_MODES.md` — failure-mode catalogue at the eval layer

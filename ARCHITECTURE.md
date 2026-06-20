@@ -2,7 +2,7 @@
 
 The project is organised into three categories. Every file in the repo belongs to exactly one of them.
 
-```
+```text
 PostgreDataMigrationApp/
 |
 +-- build/             <-- production code that gets deployed
@@ -68,7 +68,7 @@ The three layers can break independently, so we keep them physically separate. T
 
 ## Dependency direction
 
-```
+```text
 evals/   --reads--->  build/csv/validator.py
                       build/environments/env_dev.sql
                       tests/run_all_tests.sql
@@ -104,4 +104,4 @@ These are left at the repo root and excluded from the layer model. They can move
 - Shell scripts inside `build/` cd into their own directory and use relative paths (`./adapters/...`, `./schema/...`).
 - Nothing in `build/` references `tests/` or `evals/`.
 
-If a new file has to break these rules, document why in this file.
+If a new file has to break these rules, document why in this

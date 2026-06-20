@@ -29,7 +29,7 @@ In short: `tests/` proves the **code is correct**; `evals/` proves the **framewo
 
 ## Folder layout
 
-```
+```text
 PostgreDataMigrationApp/
 └── evals/
     ├── PLAN.md                          ← this file
@@ -127,4 +127,4 @@ Exit code: 0 if all scenarios in selected tiers pass, 1 otherwise. CI-friendly.
 
 ## Open questions
 
-None blocking — proceeding with the plan above. If you want to change scope or add scenarios after seeing the Tier P results, edit `FAILURE_MODES.md` and let me know.
+None blocking — proceeding with the plan above. If you want to change scope or add scenarios after seeing the Tier P results, edit `FAILURE_MODES.md` and let me

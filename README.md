@@ -4,9 +4,9 @@
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13%2B-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Environments](https://img.shields.io/badge/Environments-Dev%20%7C%20Test%20%7C%20Staging%20%7C%20Prod-blue)]()
-[![Test Suites](https://img.shields.io/badge/Tests-5%20suites%20%7C%2085%20assertions-brightgreen)]()
-[![Evals](https://img.shields.io/badge/Evals-23%20CSV%20scenarios-brightgreen)]()
+[![Environments](https://img.shields.io/badge/Environments-Dev%20%7C%20Test%20%7C%20Staging%20%7C%20Prod-blue)](#environment-comparison)
+[![Test Suites](https://img.shields.io/badge/Tests-5%20suites%20%7C%2085%20assertions-brightgreen)](#test-suite)
+[![Evals](https://img.shields.io/badge/Evals-23%20CSV%20scenarios-brightgreen)](evals/)
 [![Terraform](https://img.shields.io/badge/Terraform-1.5%2B-7B42BC?logo=terraform&logoColor=white)](https://developer.hashicorp.com/terraform)
 
 ---
@@ -42,7 +42,7 @@ All names (database, schema, users, every table) are controlled by a single `\se
 
 The project is organised into three categories: `build/` (everything that ships), `tests/` (correctness coverage), `evals/` (data-driven black-box scenarios). See **`ARCHITECTURE.md`** for the rationale.
 
-```
+```text
 PostgreDataMigrationApp/
 │
 ├── build/                             ← everything that ships
@@ -157,7 +157,7 @@ chmod +x setup.sh
 
 The wizard prompts you to select a database engine and configure all settings, then writes `config.local.env`:
 
-```
+```text
   ╔══════════════════════════════════════════════════════════════╗
   ║       PostgreDataMigrationApp — Database Setup Wizard        ║
   ║   Supports: PostgreSQL · MariaDB · SQLite · InfluxDB         ║
@@ -278,6 +278,7 @@ Every environment file contains **only a `\set` configuration block** followed b
 Each environment is fully isolated. All four can run on the same PostgreSQL instance.
 
 To deploy to a remote host:
+
 ```bash
 PGHOST=my-db-server PGPORT=5432 PGUSER=postgres ./build/deploy_all.sh staging
 ```
@@ -286,7 +287,7 @@ PGHOST=my-db-server PGPORT=5432 PGUSER=postgres ./build/deploy_all.sh staging
 
 ## Schema Reference — 12 Tables
 
-```
+```text
 organisations ──< personnel
       │
       └──< test_programs ──< temp_documents
@@ -477,7 +478,7 @@ Each eval run writes a JSON report under `evals/reports/<run_id>/summary.json`; 
 
 ### Sample output
 
-```
+```text
 ============================================================
  T&E TEST SUITE   Schema: te_dev
 ============================================================
@@ -552,6 +553,7 @@ Set your token as an environment variable (never hard-code it):
 # PowerShell (Windows)
 $env:TF_VAR_github_token="ghp_yourtoken"
 ```
+
 ```bash
 # Mac / Linux / Git Bash
 export TF_VAR_github_token="ghp_yourtoken"
@@ -620,8 +622,6 @@ terraform validate        # check configuration for errors
 
 ---
 
-
-
 Contributions are welcome. Please follow these steps:
 
 1. Fork the repository
@@ -631,6 +631,7 @@ Contributions are welcome. Please follow these steps:
 5. Open a Pull Request with a clear description of what changed and why
 
 **Guidelines:**
+
 - Keep the framework idempotent — every change must be safe to re-run
 - Add at least one test assertion for any new table column or constraint
 - Follow the existing naming convention for tables (`tbl_*`), indexes (`idx_*`), and triggers (`trg_*`)
@@ -651,7 +652,8 @@ Here are the prompts, distilled from every action I actually performed today. Ea
 ---
 
 ### Prompt 1 — Audit & Fix Stale Documentation
-```
+
+```text
 Audit all markdown docs and requirements.txt against the current codebase.
 For each file, check that referenced functions, imports, file paths, test
 counts, and CLI commands still match the code. Fix anything stale in-place.
@@ -664,7 +666,8 @@ NEW_USER_NAVIGATION_GUIDE.md, requirements.txt
 ---
 
 ### Prompt 2 — Generate Edge Case Datasets + Stress Tests
-```
+
+```text
 Generate synthetic edge case CSV datasets in sample_data/edge_cases/ and
 write matching pytest tests in tests/test_edge_cases.py. Cover these cases:
 
@@ -688,7 +691,8 @@ Run the full test suite to confirm everything passes, then push to GitHub.
 ---
 
 ### Prompt 3 — Run Tests + Generate Detailed Report for Lead
-```
+
+```text
 Run the full pytest suite and create TEST_REPORT.md at the project root.
 The report must include:
 
@@ -706,7 +710,8 @@ Push TEST_REPORT.md to GitHub.
 ---
 
 ### Prompt 4 — Repo Hygiene (one-shot cleanup)
-```
+
+```text
 Clean up the GitHub repo (amar-python/TestUploadtoGIT) in one pass:
 
 1. If files exist at both root and a nested path (e.g. OneDrive/Desktop/...),
@@ -725,7 +730,8 @@ Commit each logical change separately and push to master.
 ---
 
 ### Prompt 5 — Full Session (combines all of the above)
-```
+
+```text
 I have a CSV-to-PostgreSQL migration framework at:
 C:\Users\User\OneDrive\Desktop\Migration using ai
 GitHub repo: amar-python/TestUploadtoGIT
@@ -764,4 +770,4 @@ Do the following in order:
 
 ---
 
-The full session prompt (#5) would reproduce today's entire day of work in a single request. The individual prompts (#1-4) are useful when you only need one piece — they're modular so you can mix and match.
+The full session prompt (#5) would reproduce today's entire day of work in a single request. The individual prompts (#1-4)
