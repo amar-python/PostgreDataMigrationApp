@@ -224,7 +224,7 @@ resource "azurerm_container_app" "pg" {
 
       env {
         name  = "POSTGRES_DB"
-        value = "te_dev"
+        value = "te_${var.environment}"
       }
 
       env {

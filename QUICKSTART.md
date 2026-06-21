@@ -73,6 +73,94 @@ python evals\runner.py --tiers p,i,s
 Expected outcome with PG available: `total: 25, passed: 25, failed: 0`.
 Without PG, Tier P passes and Tiers I + S skip cleanly with a diagnostic.
 
+## CSV pitfalls — what the framework handles and what to watch for
+
+The framework's Tier P eval suite covers 22 documented CSV failure modes.
+Here are the ones most likely to bite you when loading real data, with
+how the framework responds and what to fix at the source.
+
+### Encoding and byte-level issues
+
+| Issue | What happens | Eval | Fix at source |
+|---|---|---|---|
+| UTF-8 BOM at start of file (`﻿`) | Stripped automatically — file opened with `utf-8-sig` | scenario 09 | Nothing — handled |
+| CRLF line endings (Windows) | Native — Python's `csv` module handles it | scenario 11 | Nothing — handled |
+| Latin-1 bytes (`\xe9` etc.) inside a UTF-8 file | Clean exit 1, stderr reports decode error, no traceback | scenario 23 | Re-export the source as UTF-8 |
+| Emoji / RTL / CJK in values (Alice 👋, محمد, 田中花子) | Preserved end-to-end through ingest + PG | scenarios 10, 18, 21 | Nothing — handled |
+
+### Header issues
+
+| Issue | What happens | Eval | Fix at source |
+|---|---|---|---|
+| Leading/trailing spaces in headers (` id , name `) | Normalised by `cell.strip()` to `id`, `name` | scenario 17 | Nothing — handled |
+| Duplicate column names (`id,id,name`) | Exit 0 but stdout shows `Duplicate column names` warning | scenario 06 | Rename the duplicate column in source |
+| Header-only file (no data rows) | Exit 1, stderr `No valid rows found` | scenario 04 | Add data rows or remove the empty file |
+
+### Row-shape issues
+
+| Issue | What happens | Eval | Fix at source |
+|---|---|---|---|
+| Fewer fields than header | Row skipped with `_skip_reason: column mismatch` | scenario 07 | Quote fields that may contain commas |
+| More fields than header | Same — skipped as column mismatch | scenario 07b | Same fix |
+| Completely empty row (`,,`) | Skipped as `empty row` | scenario 08 | Trim source file or accept silently |
+| Whitespace-only row (spaces around a comma) | Skipped as `empty row` (cells stripped first) | scenario 16 | Same |
+
+### Embedded special characters
+
+| Issue | What happens | Eval | Notes |
+|---|---|---|---|
+| Comma inside a quoted field: `1,"Smith, John"` | Parsed as one field `Smith, John` | scenario 13 | Just quote the field |
+| Newline inside a quoted field: `1,"line1\nline2"` | Parsed as one row, note has embedded newline | scenario 14 | Quote it |
+| Escaped quote: `1,"she said ""hi"""` | Parsed as `she said "hi"` | scenario 15 | Double the inner quotes |
+| Very long single field (≥ 50 KB) | Accepted as one row | scenario 22 | Beyond ~128 KB, raise Python's `csv.field_size_limit` |
+
+### Duplicate primary keys (the one that bit us)
+
+This is **not** caught by Tier P — it surfaces at load time. If `input.csv`
+contains rows with byte-identical primary keys, the staging table accepts
+them, then the swap to the target table fails because the PK constraint
+trips.
+
+**Symptom:**
+
+```text
+ERROR: duplicate key value violates unique constraint "<table>_pkey"
+DETAIL:  Key (col_1)=(...) already exists.
+```
+
+**Fix:** the `load_input_data.sql` script wraps the inserts with
+`SELECT DISTINCT ON (col_1) ... ORDER BY col_1` to deduplicate within
+the load. If you're loading via a different path, mirror that pattern or
+clean the CSV first:
+
+```powershell
+# Quick dedup in PowerShell (keeps first occurrence of each col_1)
+Import-Csv input.csv | Group-Object col_1 | ForEach-Object { $_.Group[0] } | Export-Csv input_dedup.csv -NoTypeInformation
+```
+
+### Missing inputs and env vars
+
+| Issue | What happens | Eval |
+|---|---|---|
+| `CSV_FILE` env var not set | Exit 1, stderr `Missing required environment variables` | scenario 19 |
+| `CSV_FILE` points at a non-existent path | Exit 1, stderr `CSV file not found` | scenario 20 |
+| Zero-byte file | Exit 1, stderr `CSV file is empty` | scenario 02 |
+
+### When in doubt — run Tier P on your own CSV
+
+The validator runs standalone, no DB needed:
+
+```powershell
+$env:CSV_FILE   = "path\to\your.csv"
+$env:VALID_CSV  = "out\valid.csv"
+$env:SKIP_FILE  = "out\skipped.csv"
+$env:TABLE_NAME = "your_table"
+python build\csv\validator.py
+```
+
+It produces `out\valid.csv` (rows that passed) and `out\skipped.csv`
+(rows that didn't, with a `_skip_reason` column explaining why).
+
 ## View the auto-generated gap report
 
 Every run writes two files under `evals\reports\<run_id>\`:
@@ -159,4 +247,4 @@ lsof -iTCP:5432 -sTCP:LISTEN
 - Read `evals\USAGE.md` for runner flags and CI integration
 - Read `VCRM_GAPS.md` for the four open gaps and remediation effort
 - Read `TEST_CONDITIONS.md` for the full catalogue of test conditions
-- Read `evals\HANDOFF.md` for what is deferred and why
+- Read `evals\HANDOFF.md` for what is def

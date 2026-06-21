@@ -289,5 +289,29 @@ BEGIN
       0::BIGINT, v_count
    );
 
+   -- ─────────────────────────────────────────────────────────────────────────
+   -- S09–S10: Per-environment PG role connection limit (closes BR-15 gap).
+   -- Each env_*.sql sets \set app_user and \set conn_limit; this asserts that
+   -- the deploy actually applied those values to pg_roles. A typo in any of
+   -- the four env files (e.g. conn_limit=5 instead of 50 in env_prod.sql)
+   -- would now be caught here instead of in production.
+   -- ─────────────────────────────────────────────────────────────────────────
+
+   -- S09: app role exists in pg_roles
+   SELECT COUNT(*) INTO v_count
+   FROM pg_roles WHERE rolname = :'app_user';
+   PERFORM :"schema_name".assert_equals(
+      'business_rules', 'S09 — App role exists in pg_roles',
+      1::BIGINT, v_count
+   );
+
+   -- S10: app role rolconnlimit matches the env's \set conn_limit
+   SELECT COALESCE(rolconnlimit, -999) INTO v_count
+   FROM pg_roles WHERE rolname = :'app_user';
+   PERFORM :"schema_name".assert_equals(
+      'business_rules', 'S10 — App role conn limit matches env config',
+      :'conn_limit'::BIGINT, v_count
+   );
+
 END;
 $$;
