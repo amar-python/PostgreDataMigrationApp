@@ -60,6 +60,7 @@ class E2EPipelineValidateOnly(unittest.TestCase):
             r = subprocess.run(
                 [sys.executable, str(VALIDATOR)],
                 env=env, capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
             )
             self.assertEqual(r.returncode, 0, r.stderr)
             valid_lines = valid_csv.read_text(encoding="utf-8").strip().splitlines()
@@ -87,6 +88,7 @@ class E2EPipelineValidateOnly(unittest.TestCase):
             r = subprocess.run(
                 [sys.executable, str(VALIDATOR)],
                 env=env, capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
             )
             self.assertEqual(r.returncode, 0, r.stderr)
             valid_lines = valid_csv.read_text(encoding="utf-8").strip().splitlines()
@@ -112,6 +114,7 @@ class E2EPipelineValidateOnly(unittest.TestCase):
             r = subprocess.run(
                 [sys.executable, str(VALIDATOR)],
                 env=env, capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
             )
             self.assertEqual(r.returncode, 1)
             self.assertIn("No valid rows", r.stderr)
@@ -133,6 +136,7 @@ class E2EPipelineValidateOnly(unittest.TestCase):
             r = subprocess.run(
                 [sys.executable, str(VALIDATOR)],
                 env=env, capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
             )
             # Either succeeds and created the dir, or fails with a clear message
             if r.returncode == 0:

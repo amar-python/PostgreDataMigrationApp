@@ -44,6 +44,7 @@ def _run_validator(csv_content: bytes, table_name: str = "people") -> tuple[str,
             capture_output=True,
             text=True,
             encoding="utf-8",
+            errors="replace",
         )
         valid_text = valid_csv.read_text(encoding="utf-8") if valid_csv.exists() else ""
         skip_text  = skip_csv.read_text(encoding="utf-8")  if skip_csv.exists()  else ""
