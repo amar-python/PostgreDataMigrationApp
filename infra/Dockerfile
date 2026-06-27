@@ -7,8 +7,11 @@
 #
 # Entrypoint dispatches on the first arg: deploy | load | evals | shell.
 #
-# Build from the repo root:
-#   docker build -f PostgreDataMigrationApp/infra/Dockerfile -t te-migration:dev .
+# Build from the PostgreDataMigrationApp repo root:
+#   docker build -f infra/Dockerfile -t te-migration:dev .
+#
+# Or via az acr build (no local Docker needed):
+#   az acr build --registry <acr> --image te-migration:dev --file infra/Dockerfile .
 #
 # Run locally (against a PG container on the same network):
 #   docker run --rm \
@@ -22,12 +25,18 @@ FROM python:3.11-slim AS base
 # psql client + bash + curl for libpq env-var support and shell scripts
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        postgresql-client-15 \
+        postgresql-client \
         bash \
         curl \
         ca-certificates \
         netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
+# NOTE: postgresql-client is the meta-package — it tracks whatever Debian
+# ships (Debian 12 = client 15, Debian 13 = client 17). The PG wire
+# protocol is stable across these versions, so the client talks to PG 16
+# server in the Container App without trouble. Pinning to a specific
+# version (e.g. postgresql-client-15) breaks the build whenever the
+# python:3.11-slim base image moves to a newer Debian.
 
 # Non-root user — never run migrations as root
 RUN groupadd --gid 1001 app \
@@ -35,12 +44,17 @@ RUN groupadd --gid 1001 app \
 
 WORKDIR /opt/migration
 
-# Copy only what the runner needs (NOT the .git folder, IDE configs, etc.)
-COPY --chown=app:app PostgreDataMigrationApp/build/        ./build/
-COPY --chown=app:app PostgreDataMigrationApp/tests/        ./tests/
-COPY --chown=app:app PostgreDataMigrationApp/evals/        ./evals/
-COPY --chown=app:app PostgreDataMigrationApp/input_data/   ./input_data/
-COPY --chown=app:app PostgreDataMigrationApp/infra/entrypoint.sh ./entrypoint.sh
+# Copy only what the runner needs (NOT the .git folder, IDE configs, etc.).
+# Build context is the PostgreDataMigrationApp repo root, so paths are
+# relative to that — NO `PostgreDataMigrationApp/` prefix.
+COPY --chown=app:app build/        ./build/
+COPY --chown=app:app tests/        ./tests/
+COPY --chown=app:app evals/        ./evals/
+COPY --chown=app:app infra/entrypoint.sh ./entrypoint.sh
+# NOTE: input_data/ is intentionally NOT copied. It's CSV fixtures used
+# only during the `load` action and lives in a separate repo / Azure
+# Files mount. The entrypoint's load step skips gracefully if it isn't
+# present in the image.
 
 RUN chmod +x entrypoint.sh build/deploy_all.sh build/setup.sh 2>/dev/null || true
 RUN find build -name '*.sh' -exec chmod +x {} \;

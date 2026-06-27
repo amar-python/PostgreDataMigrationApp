@@ -32,13 +32,13 @@ terraform {
 
   # Production state MUST be in remote storage. Uncomment after creating the
   # state storage account (see PROD_DEPLOY.md "One-time setup").
-  #
-  # backend "azurerm" {
-  #   resource_group_name  = "rg-tfstate"
-  #   storage_account_name = "sttfstateprod<XXXX>"
-  #   container_name       = "tfstate"
-  #   key                  = "te-prod.tfstate"
-  # }
+
+  backend "azurerm" {
+    resource_group_name  = "rg-tfstate"
+    storage_account_name = "sttfstateprod7u8hql"
+    container_name       = "tfstate"
+    key                  = "te-prod.tfstate"
+  }
 }
 
 provider "azurerm" {
@@ -110,6 +110,14 @@ resource "azurerm_subnet" "cae" {
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = [cidrsubnet(var.vnet_cidr, 4, 1)] # /24 chunk 1
+
+  delegation {
+    name = "cae-delegation"
+    service_delegation {
+      name    = "Microsoft.App/environments"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
 }
 
 resource "azurerm_subnet" "endpoints" {
@@ -172,7 +180,7 @@ resource "azurerm_key_vault" "kv" {
   soft_delete_retention_days    = 90
   purge_protection_enabled      = true
   enable_rbac_authorization     = true
-  public_network_access_enabled = false # private endpoint only
+  public_network_access_enabled = true # temporarily enabled so Terraform can seed the secret; flip to false after bootstrap
   tags                          = local.tags
 }
 
@@ -284,11 +292,12 @@ resource "azurerm_container_registry" "acr" {
   location                      = azurerm_resource_group.rg.location
   sku                           = "Premium"
   admin_enabled                 = false # Use managed identity
-  public_network_access_enabled = false
+  public_network_access_enabled = true # temporarily enabled so az acr build can push; flip to false after bootstrap
   tags                          = local.tags
 
   retention_policy_in_days = 30
-  trust_policy_enabled     = true # Content trust for signed images
+  # trust_policy removed — Azure Content Trust is deprecated and unsupported
+  # for new registries. Use ACR image signing or Notary v2 when required.
 }
 
 resource "azurerm_private_endpoint" "acr" {
@@ -440,7 +449,7 @@ resource "azurerm_container_app_job" "migration" {
   template {
     container {
       name   = "migration"
-      image  = "${azurerm_container_registry.acr.login_server}/te-migration:placeholder"
+      image  = "${azurerm_container_registry.acr.login_server}/te-migration:prod-initial"
       cpu    = 1.0
       memory = "2Gi"
 

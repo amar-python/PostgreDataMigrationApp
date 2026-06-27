@@ -10,6 +10,14 @@
 #   - psql installed and on PATH
 #   - Running as a PostgreSQL superuser (default: postgres)
 #   - Script run from the te_database_setup/ directory
+#
+# SCOPE NOTE: This deployer is intentionally PostgreSQL-only despite the
+# presence of build/adapters/adapter_<engine>.sh stubs for MariaDB / SQLite /
+# InfluxDB / Redis / Teradata. Multi-engine routing is tracked in VCRM_GAPS.md
+# as BR-02 (deferred). When you add it, the natural place is right before the
+# deploy loop below: dispatch to build/adapters/adapter_$ENGINE.sh instead of
+# running psql directly. Until then, only PostgreSQL targets are validated by
+# the eval suite (Tier S in particular).
 # =============================================================================
 
 set -euo pipefail

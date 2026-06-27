@@ -29,8 +29,18 @@ info()    { echo -e "  $*"; }
 warn()    { echo -e "${YELLOW}  ⚠ $*${NC}"; }
 
 # ── Load defaults ─────────────────────────────────────────────────────────────
-[[ ! -f "$CONFIG_TEMPLATE" ]] && { echo "ERROR: config.env not found."; exit 1; }
-source "$CONFIG_TEMPLATE"
+# Prefer config.env; fall back to config.env.example so a fresh checkout works
+# without forcing the user to copy the file before their first run.
+if [[ -f "$CONFIG_TEMPLATE" ]]; then
+   source "$CONFIG_TEMPLATE"
+elif [[ -f "${CONFIG_TEMPLATE}.example" ]]; then
+   echo "INFO: config.env not found; using config.env.example as defaults."
+   echo "      Run 'cp config.env.example config.env' to make a local copy."
+   source "${CONFIG_TEMPLATE}.example"
+else
+   echo "ERROR: neither config.env nor config.env.example found in ${SCRIPT_DIR}"
+   exit 1
+fi
 
 # ── Helper: ask with default (supports hidden input for passwords) ─────────────
 ask() {

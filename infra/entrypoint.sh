@@ -39,6 +39,11 @@ run_deploy() {
 
 run_load() {
     wait_for_pg
+    if [ ! -f /opt/migration/input_data/load_input_data.sql ]; then
+        echo "--- SKIP load: no input_data/load_input_data.sql in image ---"
+        echo "    (mount input_data as a volume or rebuild the image with it included)"
+        return 0
+    fi
     echo "--- Loading input data ---"
     psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
          -v ON_ERROR_STOP=1 \

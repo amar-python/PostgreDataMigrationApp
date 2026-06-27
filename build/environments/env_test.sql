@@ -38,4 +38,4 @@
 
 -- ── END OF CONFIGURATION ─────────────────────────────────────────────────────
 
-\i te_core_schema.sql
+\ir ../te_core_schema.sql

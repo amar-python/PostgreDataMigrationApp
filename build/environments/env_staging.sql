@@ -16,8 +16,12 @@
 
 -- Application user
 \set app_user           te_stg_user
-\set app_password       Stg@Secure#2025!
 \set conn_limit         20
+
+-- app_password should be injected from your secrets manager.
+-- Pass via: psql -v app_password="$(az keyvault secret show ...)" -f env_staging.sql
+-- Uncomment the next line only for non-secret local experiments:
+-- \set app_password 'Stg@Secure#2025!'
 
 -- Table names
 \set tbl_organisations  organisations
@@ -39,4 +43,11 @@
 
 -- ── END OF CONFIGURATION ─────────────────────────────────────────────────────
 
-\i te_core_schema.sql
+-- Fail fast if caller did not inject app_password.
+\if :{?app_password}
+\else
+   \echo 'ERROR: -v app_password=<value> is required for env_staging.sql.'
+   \quit
+\endif
+
+\ir ../te_core_schema.sql

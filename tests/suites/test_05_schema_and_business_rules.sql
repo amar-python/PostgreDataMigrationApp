@@ -193,6 +193,7 @@ BEGIN
    PERFORM :"schema_name".assert_equals(
       'schema', 'R04 — Trigger trg_updated_at registered on defect_reports', 1::BIGINT, v_count);
 
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION S: BUSINESS RULES — Cross-table logic
 -- ─────────────────────────────────────────────────────────────────────────────

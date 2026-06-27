@@ -21,10 +21,14 @@
 \set schema_name        te_prod
 
 -- Application user
--- ⚠ Replace this password with a vault-managed secret before deploying
 \set app_user           te_prod_user
-\set app_password       ChangeMe!Pr0d@Vault
 \set conn_limit         50
+
+-- ⚠ app_password MUST be injected from your secrets manager.
+--   Pass via: psql -v app_password="$(az keyvault secret show ...)" -f env_prod.sql
+--   The line below is INTENTIONALLY commented out — uncommenting it for
+--   production is a security incident.
+-- \set app_password 'do-not-commit-real-passwords-here'
 
 -- Table names
 \set tbl_organisations  organisations
@@ -45,4 +49,12 @@
 
 -- ── END OF CONFIGURATION ─────────────────────────────────────────────────────
 
-\i te_core_schema.sql
+-- Fail fast if caller did not inject app_password.
+\if :{?app_password}
+\else
+   \echo 'ERROR: -v app_password=<value> is required for env_prod.sql.'
+   \echo 'Example: psql -v app_password="$(az keyvault secret show ...)" -f env_prod.sql'
+   \quit
+\endif
+
+\ir ../te_core_schema.sql

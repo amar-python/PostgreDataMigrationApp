@@ -11,6 +11,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 
 class CsvValidatorTests(unittest.TestCase):
     def setUp(self):

@@ -38,4 +38,7 @@
 
 -- ── END OF CONFIGURATION ─────────────────────────────────────────────────────
 
-\i te_core_schema.sql
+-- \ir (include relative) resolves relative to THIS file's directory, so
+-- the deploy works regardless of the caller's cwd. \i would have been
+-- cwd-relative and broken under `psql --file=` from any other directory.
+\ir ../te_core_schema.sql
