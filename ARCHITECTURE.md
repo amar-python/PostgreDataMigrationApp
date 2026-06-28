@@ -30,13 +30,15 @@ The three layers can break independently, so we keep them physically separate. T
 |------|-----------|
 | `build/te_core_schema.sql` | PostgreSQL master schema (legacy entry point) |
 | `build/te_seed_data.sql` | Seed data |
-| `build/csv/` | Python CSV validator (`validator.py`) + per-engine shell loaders (`loader_*.sh`) |
+| `build/csv/` | Python CSV validator (`validator.py`), per-engine shell loaders (`loader_*.sh`), and `samples/` |
 | `build/adapters/` | Per-engine deployment adapters (`adapter_postgresql.sh`, `adapter_mariadb.sh`, etc.) |
 | `build/schema/` | Engine-specific DDL and seed data |
 | `build/environments/` | PostgreSQL per-environment launchers (`env_dev.sql`, `env_test.sql`, etc.) |
 | `build/terraform-github-repos/` | GitHub repository management as Infrastructure-as-Code |
 | `build/setup.sh` | Interactive multi-database configuration wizard |
 | `build/deploy_all.sh` | Multi-engine deployment router |
+| `build/csv_loader.sh` | Schema-agnostic CSV ingestion: any CSV → auto-created table |
+| `build/csv_utilise.sh` | Companion to the loader: list / describe / peek / export / drop CSV-loaded tables (PostgreSQL) |
 
 ### `tests/` — correctness coverage
 
