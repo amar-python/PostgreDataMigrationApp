@@ -1,6 +1,7 @@
 .PHONY: test-free test-gate test-evals test-e2e test-all \
         lint lint-diff health \
-        eval-list eval-compare eval-summary select-tests
+        eval-list eval-compare eval-summary select-tests \
+        csv-load csv-list csv-demo
 
 # ── Test tiers ────────────────────────────────────────────────────────────────
 
@@ -69,3 +70,27 @@ eval-summary:
 # Mirrors: bun run eval:select
 select-tests:
 	python3 scripts/select_tests.py
+
+# ── CSV loader / utiliser ─────────────────────────────────────────────────────
+
+# Load any CSV file into the target environment's database.
+# Usage: make csv-load FILE=path/to.csv [ENV=dev] [ENGINE=postgresql]
+csv-load:
+	@if [ -z "$(FILE)" ]; then \
+	    echo "Usage: make csv-load FILE=path/to.csv [ENV=dev] [ENGINE=postgresql]"; \
+	    exit 1; \
+	fi
+	bash build/csv_loader.sh "$(FILE)" --env $(or $(ENV),dev) $(if $(ENGINE),--engine $(ENGINE),)
+
+# List CSV-loaded tables in the target environment.
+# Usage: make csv-list [ENV=dev]
+csv-list:
+	bash build/csv_utilise.sh list --env $(or $(ENV),dev)
+
+# One-shot proof: load the three sample CSVs into dev, then list them.
+# Usage: make csv-demo [ENV=dev]
+csv-demo:
+	bash build/csv_loader.sh build/csv/samples/customers.csv --env $(or $(ENV),dev)
+	bash build/csv_loader.sh build/csv/samples/orders.csv    --env $(or $(ENV),dev)
+	bash build/csv_loader.sh build/csv/samples/inventory.csv --env $(or $(ENV),dev)
+	bash build/csv_utilise.sh list --env $(or $(ENV),dev)

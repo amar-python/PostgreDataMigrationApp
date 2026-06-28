@@ -290,6 +290,30 @@ CSV inputs must have a header row, use comma delimiters, and be UTF-8 encoded wi
 
 Supported loader backends are PostgreSQL, MariaDB/MySQL, SQLite, InfluxDB, Redis, and Teradata. PostgreSQL uses `COPY`, MariaDB/MySQL uses `LOAD DATA LOCAL INFILE`, SQLite uses Python `csv` + `sqlite3`, InfluxDB writes line protocol via the `influx` CLI, Redis writes hashes through `redis-cli`, and Teradata uses BTEQ/FastLoad tooling.
 
+### Load any CSV
+
+The loader is schema-agnostic — drop any CSV file in front of it and a matching table is auto-created in the target environment's database. Every CSV-loaded table is tagged with two marker columns: `_csv_row_id BIGSERIAL PRIMARY KEY` and `_loaded_at TIMESTAMPTZ`. All other columns start as `TEXT`; `ALTER TABLE` afterwards if you need stricter types.
+
+Three sample CSVs ship under `build/csv/samples/` (`customers.csv`, `orders.csv`, `inventory.csv`) — deliberately off-domain from the T&E schema to demonstrate that any shape is accepted.
+
+```bash
+# Single-command happy-path proof (loads all three samples into dev, lists them)
+make csv-demo
+
+# Load any CSV
+make csv-load FILE=path/to/anything.csv          # ENV defaults to dev
+make csv-load FILE=path/to/anything.csv ENV=test ENGINE=postgresql
+
+# Use loaded data — companion script: build/csv_utilise.sh (PostgreSQL only)
+./build/csv_utilise.sh list                       # all CSV-loaded tables in the env
+./build/csv_utilise.sh describe customers         # columns + row count
+./build/csv_utilise.sh peek orders --limit 5      # first N rows
+./build/csv_utilise.sh export inventory dump.csv  # round-trip back to CSV
+./build/csv_utilise.sh drop customers --yes       # remove a CSV-loaded table
+```
+
+`csv_utilise.sh` only sees tables that carry the marker columns, so it cannot accidentally touch the rigid te_core_schema tables.
+
 ---
 
 ## How Parameterisation Works

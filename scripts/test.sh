@@ -67,8 +67,9 @@ if command -v pytest >/dev/null 2>&1; then
         record "pytest unit" FAIL "exit=$?"
     fi
 else
-    echo "${Y}[layer 1] SKIP: pytest not installed${X}"
-    record "pytest unit" PASS "skipped"
+    echo "${R}[layer 1] FAIL: pytest not installed${X}"
+    echo "${Y}    Run: pip install -r requirements-dev.txt${X}"
+    record "pytest unit" FAIL "pytest missing — pip install -r requirements-dev.txt"
 fi
 
 # --- Layer 2: SQL suite ---

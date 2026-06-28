@@ -54,8 +54,9 @@ try {
         Record -Layer 'pytest unit' -Pass $pass -Detail "exit=$LASTEXITCODE"
         Write-Host "[layer 1] $(if ($pass) {'PASS'} else {'FAIL'})" -ForegroundColor $(if ($pass) {'Green'} else {'Red'})
     } else {
-        Write-Host "[layer 1] SKIP: pytest not installed (pip install pytest)" -ForegroundColor Yellow
-        Record -Layer 'pytest unit' -Pass $true -Detail 'skipped: pytest not installed'
+        Write-Host "[layer 1] FAIL: pytest not installed" -ForegroundColor Red
+        Write-Host "    Run: pip install -r requirements-dev.txt" -ForegroundColor Yellow
+        Record -Layer 'pytest unit' -Pass $false -Detail 'pytest missing — pip install -r requirements-dev.txt'
     }
 
     # --- Layer 2: SQL test suite ---

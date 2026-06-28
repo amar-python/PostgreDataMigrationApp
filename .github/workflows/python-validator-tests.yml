@@ -19,6 +19,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
       - name: Run validator unit tests (PowerShell)
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
