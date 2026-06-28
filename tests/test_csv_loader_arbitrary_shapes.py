@@ -12,6 +12,7 @@ import csv
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,6 +25,23 @@ ROOT       = Path(__file__).resolve().parents[1]
 LOADER     = ROOT / "build" / "csv_loader.sh"
 UTILISE    = ROOT / "build" / "csv_utilise.sh"
 BUILD_DIR  = ROOT / "build"
+
+
+def _find_bash():
+    """Locate a real bash; on Windows prefer Git Bash over the WSL shim."""
+    if sys.platform == "win32":
+        for c in (r"C:\Program Files\Git\bin\bash.exe",
+                  r"C:\Program Files (x86)\Git\bin\bash.exe"):
+            if Path(c).exists():
+                return c
+        which = shutil.which("bash")
+        if which and "system32" not in which.lower():
+            return which
+        return None
+    return shutil.which("bash") or "bash"
+
+
+_BASH = _find_bash()
 
 
 def _can_connect_pg() -> bool:
@@ -75,7 +93,7 @@ class CsvLoaderArbitraryShapes(unittest.TestCase):
             _write_csv(csv_path, n_cols, n_rows)
 
             load = subprocess.run(
-                ["bash", str(LOADER), str(csv_path), "--env", "dev"],
+                [_BASH, str(LOADER), str(csv_path), "--env", "dev"],
                 capture_output=True, text=True, cwd=ROOT,
             )
             self.assertEqual(
@@ -86,7 +104,7 @@ class CsvLoaderArbitraryShapes(unittest.TestCase):
             try:
                 # Verify via csv_utilise.sh describe (also asserts marker columns present).
                 describe = subprocess.run(
-                    ["bash", str(UTILISE), "describe", table, "--env", "dev"],
+                    [_BASH, str(UTILISE), "describe", table, "--env", "dev"],
                     capture_output=True, text=True, cwd=ROOT,
                 )
                 self.assertEqual(describe.returncode, 0, describe.stderr)
@@ -94,7 +112,7 @@ class CsvLoaderArbitraryShapes(unittest.TestCase):
             finally:
                 # Always drop the table — keep dev clean.
                 subprocess.run(
-                    ["bash", str(UTILISE), "drop", table, "--yes", "--env", "dev"],
+                    [_BASH, str(UTILISE), "drop", table, "--yes", "--env", "dev"],
                     capture_output=True, text=True, cwd=ROOT,
                 )
 

@@ -5,7 +5,9 @@ Database-backed paths (list/describe/peek/export/drop against a real schema)
 live alongside the integration tests in test_csv_loader_arbitrary_shapes.py.
 """
 import os
+import shutil
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -16,16 +18,40 @@ pytestmark = pytest.mark.unit
 SCRIPT = Path(__file__).resolve().parents[1] / "build" / "csv_utilise.sh"
 
 
+def _find_bash():
+    """Locate a real bash. On Windows, PATH-resolved `bash` is often WSL
+    (which may have no distro installed); prefer Git Bash explicitly.
+    Returns the absolute path, or None if no working bash is found."""
+    if sys.platform == "win32":
+        candidates = [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files (x86)\Git\bin\bash.exe",
+        ]
+        for c in candidates:
+            if Path(c).exists():
+                return c
+        # Last resort: PATH lookup, but skip wsl shims.
+        which = shutil.which("bash")
+        if which and "system32" not in which.lower():
+            return which
+        return None
+    return shutil.which("bash") or "bash"
+
+
+_BASH = _find_bash()
+
+
 def run(args, env=None):
     """Run csv_utilise.sh with the given args; capture output."""
     return subprocess.run(
-        ["bash", str(SCRIPT), *args],
+        [_BASH, str(SCRIPT), *args],
         env={**os.environ, **(env or {})},
         capture_output=True,
         text=True,
     )
 
 
+@unittest.skipIf(_BASH is None, "No working bash found (Git Bash recommended on Windows)")
 class CsvUtiliseArgumentParsing(unittest.TestCase):
     def test_no_args_shows_usage_and_exits_nonzero(self):
         """No args → exit 1 with usage banner on stdout."""
