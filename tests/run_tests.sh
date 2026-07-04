@@ -45,6 +45,18 @@ declare -A ENV_SCHEMA=(
    [staging]="te_staging"
    [prod]="te_prod"
 )
+declare -A ENV_APP_USER=(
+   [dev]="te_dev_user"
+   [test]="te_test_user"
+   [staging]="te_stg_user"
+   [prod]="te_prod_user"
+)
+declare -A ENV_CONN_LIMIT=(
+   [dev]="10"
+   [test]="15"
+   [staging]="20"
+   [prod]="50"
+)
 
 ALL_ENVS=(dev test staging prod)
 TABLE_VARS=(
@@ -64,8 +76,11 @@ TABLE_VARS=(
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 build_psql_vars() {
-   local schema="$1"
+   local env="$1"
+   local schema="${ENV_SCHEMA[$env]}"
    local vars="--set schema_name=${schema}"
+   vars+=" --set app_user=${ENV_APP_USER[$env]}"
+   vars+=" --set conn_limit=${ENV_CONN_LIMIT[$env]}"
    for kv in "${TABLE_VARS[@]}"; do
       vars+=" --set ${kv}"
    done
@@ -77,7 +92,7 @@ run_suite() {
    local db="${ENV_DB[$env]}"
    local schema="${ENV_SCHEMA[$env]}"
    local vars
-   vars=$(build_psql_vars "${schema}")
+   vars=$(build_psql_vars "${env}")
 
    separator
    info "Running tests against: ${env^^}  (db=${db}  schema=${schema})"

@@ -31,6 +31,16 @@
 \echo ''
 
 -- ── Step 1: Load the test framework (results table + assertion functions) ─────
+
+-- Set search_path so framework objects and assertions resolve without schema prefix.
+-- Expose per-env vars via current_setting() for PL/pgSQL DO blocks (:'var' doesn't
+-- substitute inside $dollar-quoted$ strings in psql 18).
+SELECT
+   set_config('search_path',    :'schema_name' || ',public', false),
+   set_config('te.schema_name', :'schema_name',              false),
+   set_config('te.app_user',    :'app_user',                 false),
+   set_config('te.conn_limit',  :'conn_limit',               false);
+
 \echo '>> Loading test framework...'
 \i tests/framework/test_framework.sql
 
