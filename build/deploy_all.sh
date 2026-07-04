@@ -75,8 +75,32 @@ for env in "${ENVS_TO_DEPLOY[@]}"; do
       continue
    fi
 
+   DB_NAME="te_mgmt_${env}"
+
    echo ""
-   warn "Deploying environment: ${env^^}"
+   warn "Deploying environment: ${env^^}  (database: ${DB_NAME})"
+
+   # Create the database if it doesn't exist.
+   # CREATE DATABASE cannot run inside a transaction, so we handle it here
+   # at the shell level rather than inside te_core_schema.sql's DO block.
+   DB_EXISTS=$(${PSQL} -d postgres -tA -c \
+      "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" 2>/dev/null || true)
+   if [[ -z "${DB_EXISTS}" ]]; then
+      log "Creating database: ${DB_NAME}"
+      ${PSQL} -d postgres -c \
+         "CREATE DATABASE \"${DB_NAME}\"
+            WITH OWNER = postgres
+            ENCODING = 'UTF8'
+            TEMPLATE = template0
+            CONNECTION LIMIT = -1" || {
+         error "Failed to create database ${DB_NAME}"
+         FAILED+=("${env}")
+         continue
+      }
+      log "Database ${DB_NAME} created."
+   else
+      log "Database ${DB_NAME} already exists — skipping CREATE."
+   fi
 
    if ${PSQL} \
          --set=ON_ERROR_STOP=1 \
