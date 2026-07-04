@@ -47,3 +47,8 @@ terraform-github-repos/*.tfstate
 terraform-github-repos/*.tfstate.*
 terraform-github-repos/crash.log
 .abacusai/
+
+# Terraform plan artifacts (binary, environment-specific, never commit)
+*.tfplan
+tfplan
+.terraform.lock.hcl
