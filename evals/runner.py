@@ -305,7 +305,8 @@ _DEV_SEED_TABLES = [
 def _count_dev_rows() -> Dict[str, Any]:
     counts: Dict[str, Any] = {}
     for tbl in _DEV_SEED_TABLES:
-        query = 'SELECT count(*) FROM te_dev."' + tbl + '";'
+        # tbl comes from the hardcoded _DEV_SEED_TABLES constant — not injectable
+        query = 'SELECT count(*) FROM te_dev."' + tbl + '";'  # nosec B608
         r = subprocess.run(
             ["psql", "-tA", "-d", "te_mgmt_dev", "-c", query],
             env=_pg_env(),

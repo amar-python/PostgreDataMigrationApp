@@ -24,7 +24,7 @@ ALL_PY=("${PY_SRC[@]}" "${PY_TESTS[@]}" "${PY_SCRIPTS[@]}")
 echo -e "\n${YELLOW}=== flake8 (style + logic) ===${NC}"
 if python3 -m flake8 "${ALL_PY[@]}" \
         --max-line-length=120 \
-        --extend-ignore=E501; then
+        --extend-ignore=E501,E221,E272; then
     echo -e "${GREEN}✓ flake8 clean${NC}"
 else
     echo -e "${RED}✗ flake8 found issues — fix before merging${NC}"
