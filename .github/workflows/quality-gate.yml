@@ -88,6 +88,17 @@ jobs:
           PG_SCHEMA_TEST="te_test"
           EOF
 
+      # env_*.sql scripts do not create their databases — deploy_all.sh does that
+      # before invoking them (see build/te_core_schema.sql:41). Mirror it here.
+      - name: Create environment databases
+        run: |
+          for db in te_mgmt_dev te_mgmt_test; do
+            if [ -z "$(psql -d postgres -tA -c "SELECT 1 FROM pg_database WHERE datname = '$db'")" ]; then
+              psql -v ON_ERROR_STOP=1 -d postgres -c \
+                "CREATE DATABASE \"$db\" WITH OWNER = postgres ENCODING = 'UTF8' TEMPLATE = template0 CONNECTION LIMIT = -1"
+            fi
+          done
+
       - name: Evals — Tiers P, I, S
         run: python3 evals/runner.py --tiers p,i,s --verbose
 
