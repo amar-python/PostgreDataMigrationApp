@@ -457,6 +457,8 @@ def _run_fresh_deploy_then_tests(
 
     table_overrides = [
         "--set", "schema_name=te_dev",
+        "--set", "app_user=te_dev_user",
+        "--set", "conn_limit=10",
         "--set", "tbl_organisations=organisations",
         "--set", "tbl_personnel=personnel",
         "--set", "tbl_test_programs=test_programs",
@@ -487,14 +489,18 @@ def _run_fresh_deploy_then_tests(
     total_assertions = None
     pass_rate        = None
     for line in tests.stdout.splitlines():
-        parts = line.split()
-        if (len(parts) >= 5 and parts[0].isdigit() and parts[1].isdigit()
-                and parts[2].isdigit() and parts[3].endswith("%")):
-            try:
-                total_assertions = int(parts[0])
-                pass_rate        = float(parts[3].rstrip("%"))
-            except ValueError:
-                pass
+        # Summary row may be plain ("142 142 0 100.0% ...") or a psql table
+        # row ("142 |  142 |  0 | 0 | 100.0% | ..."); strip pipes first.
+        parts = line.replace("|", " ").split()
+        if (len(parts) >= 4 and parts[0].isdigit() and parts[1].isdigit()
+                and parts[2].isdigit()):
+            pct = next((p for p in parts[3:] if p.endswith("%")), None)
+            if pct is not None:
+                try:
+                    total_assertions = int(parts[0])
+                    pass_rate        = float(pct.rstrip("%"))
+                except ValueError:
+                    pass
     actual["total_assertions"] = total_assertions
     actual["pass_rate"]        = pass_rate
     result.actual              = actual

@@ -124,7 +124,7 @@ BEGIN
 
       PERFORM assert_true(
          'schema', 'R01 — Trigger fires: organisations.updated_at advances on UPDATE',
-         $b$ $b$ || v_ts2::TEXT || ' > ' || v_ts1::TEXT
+         (v_ts2 > v_ts1)::TEXT
       );
    END;
 
@@ -143,7 +143,7 @@ BEGIN
 
       PERFORM assert_true(
          'schema', 'R02 — Trigger fires: test_programs.updated_at advances on UPDATE',
-         $b$ $b$ || v_ts2::TEXT || ' > ' || v_ts1::TEXT
+         (v_ts2 > v_ts1)::TEXT
       );
    END;
 
