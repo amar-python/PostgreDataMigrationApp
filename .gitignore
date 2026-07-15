@@ -80,3 +80,4 @@ docs/Phase0-Setup-Manual.docx
 docs/Phase0-Setup-Manual.pdf
 *.docx
 *.pdf
+.github/
