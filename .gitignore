@@ -16,8 +16,11 @@ pg_dump_*
 test_output/
 *.out
 *.log
+# Migration engine runtime artifacts (relocated under backend/migration/)
 csv/logs/
 evals/reports/
+backend/migration/build/csv/logs/
+backend/migration/evals/reports/
 *_report_*.txt
 *_skipped_*.csv
 *_valid_*.csv
@@ -48,7 +51,34 @@ terraform-github-repos/*.tfstate.*
 terraform-github-repos/crash.log
 .abacusai/
 
+# --- MEP v2 (Migration Evaluation Platform) ---
+# Node / React frontend
+node_modules/
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.next/
+npm-debug.log*
+yarn-error.log*
+# Python bytecode / virtualenvs
+__pycache__/
+*.py[cod]
+.env
+.env.*
+# CSV upload staging (keep the directory, ignore its contents)
+uploads/*
+!uploads/.gitkeep
+reports/
+*.db
+test_*.db
+
 # Terraform plan artifacts (binary, environment-specific, never commit)
 *.tfplan
 tfplan
 .terraform.lock.hcl
+docs/Phase0-Setup-Manual.docx
+docs/Phase0-Setup-Manual.pdf
+*.docx
+*.pdf
+# .github/workflows/ci.yml — parked at docs/ci/ci.yml.pending (GitHub App lacks workflows permission)
+backend/uploads/

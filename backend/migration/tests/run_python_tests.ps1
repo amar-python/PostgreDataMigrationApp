@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($TestPath)) {
-    python -m unittest discover -s tests -p "test*.py" -v
+    python -m unittest discover -s backend/migration/tests -p "test*.py" -v
 } else {
     python -m unittest -v $TestPath
 }

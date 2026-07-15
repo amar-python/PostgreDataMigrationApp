@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+ENGINE = ROOT / "backend" / "migration"
 
 GREEN  = "\033[0;32m"
 YELLOW = "\033[1;33m"
@@ -60,9 +61,9 @@ def _check_py_syntax(label: str, path: Path) -> None:
 
 def check_core_python() -> None:
     files = {
-        "validator.py syntax":  ROOT / "build" / "csv" / "validator.py",
-        "runner.py syntax":     ROOT / "evals" / "runner.py",
-        "gap_report.py syntax": ROOT / "evals" / "gap_report.py",
+        "validator.py syntax":  ENGINE / "build" / "csv" / "validator.py",
+        "runner.py syntax":     ENGINE / "evals" / "runner.py",
+        "gap_report.py syntax": ENGINE / "evals" / "gap_report.py",
     }
     for label, path in files.items():
         _check_py_syntax(label, path)
@@ -72,13 +73,13 @@ def check_core_python() -> None:
 
 def check_shell_scripts() -> None:
     scripts = [
-        ROOT / "build" / "deploy_all.sh",
-        ROOT / "build" / "setup.sh",
-        ROOT / "build" / "csv_loader.sh",
+        ENGINE / "build" / "deploy_all.sh",
+        ENGINE / "build" / "setup.sh",
+        ENGINE / "build" / "csv_loader.sh",
         ROOT / "preflight.sh",
     ]
-    adapters = (ROOT / "build" / "adapters").glob("adapter_*.sh")
-    loaders  = (ROOT / "build" / "csv").glob("loader_*.sh")
+    adapters = (ENGINE / "build" / "adapters").glob("adapter_*.sh")
+    loaders  = (ENGINE / "build" / "csv").glob("loader_*.sh")
     for path in [*scripts, *adapters, *loaders]:
         rel = path.relative_to(ROOT)
         _check_file(str(rel), path)
@@ -87,15 +88,15 @@ def check_shell_scripts() -> None:
 # ── SQL schema & environment files ───────────────────────────────────────────
 
 def check_sql_files() -> None:
-    pg_schema = ROOT / "build" / "schema" / "postgresql" / "te_core_schema.sql"
+    pg_schema = ENGINE / "build" / "schema" / "postgresql" / "te_core_schema.sql"
     _check_file("postgresql schema", pg_schema)
 
     envs = ["dev", "test", "staging", "prod"]
     for env in envs:
-        path = ROOT / "build" / "environments" / f"env_{env}.sql"
+        path = ENGINE / "build" / "environments" / f"env_{env}.sql"
         _check_file(f"env_{env}.sql", path)
 
-    suite_dir = ROOT / "tests" / "suites"
+    suite_dir = ENGINE / "tests" / "suites"
     suites = sorted(suite_dir.glob("test_*.sql")) if suite_dir.exists() else []
     if suites:
         for s in suites:
@@ -103,15 +104,15 @@ def check_sql_files() -> None:
     else:
         _fail("SQL test suites", f"no test_*.sql files found in {suite_dir.relative_to(ROOT)}")
 
-    framework = ROOT / "tests" / "framework" / "test_framework.sql"
+    framework = ENGINE / "tests" / "framework" / "test_framework.sql"
     _check_file("test_framework.sql", framework)
 
 
 # ── Eval datasets & expected files ────────────────────────────────────────────
 
 def check_eval_coverage() -> None:
-    datasets_root = ROOT / "evals" / "datasets"
-    expected_root = ROOT / "evals" / "expected"
+    datasets_root = ENGINE / "evals" / "datasets"
+    expected_root = ENGINE / "evals" / "expected"
 
     if not datasets_root.exists():
         _fail("eval datasets dir", f"missing: {datasets_root.relative_to(ROOT)}")
@@ -159,7 +160,7 @@ def check_eval_coverage() -> None:
 def check_test_infra() -> None:
     files = {
         "pytest.ini":        ROOT / "pytest.ini",
-        "conftest.py":       ROOT / "tests" / "conftest.py",
+        "conftest.py":       ENGINE / "tests" / "conftest.py",
         "requirements-dev":  ROOT / "requirements-dev.txt",
         "Makefile":          ROOT / "Makefile",
         "run_qa.ps1":        ROOT / "scripts" / "run_qa.ps1",
@@ -167,17 +168,17 @@ def check_test_infra() -> None:
     for label, path in files.items():
         _check_file(label, path)
 
-    test_files = list((ROOT / "tests").glob("test_*.py"))
+    test_files = list((ENGINE / "tests").glob("test_*.py"))
     if test_files:
         _pass(f"python test files ({len(test_files)} found)")
     else:
-        _fail("python test files", "no test_*.py found in tests/")
+        _fail("python test files", "no test_*.py found in backend/migration/tests/")
 
 
 # ── Config template ───────────────────────────────────────────────────────────
 
 def check_config() -> None:
-    example = ROOT / "build" / "config.env.example"
+    example = ENGINE / "build" / "config.env.example"
     if not example.exists():
         _fail("config.env.example", "missing")
         return

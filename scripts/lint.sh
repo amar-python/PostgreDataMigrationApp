@@ -6,14 +6,14 @@ set -euo pipefail
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
 PY_SRC=(
-    build/csv/validator.py
-    evals/runner.py
-    evals/gap_report.py
+    backend/migration/build/csv/validator.py
+    backend/migration/evals/runner.py
+    backend/migration/evals/gap_report.py
 )
 
 PY_TESTS=(
-    tests/test_csv_validator.py
-    tests/test_evals_runner.py
+    backend/migration/tests/test_csv_validator.py
+    backend/migration/tests/test_evals_runner.py
 )
 
 # Collect scripts/*.py dynamically

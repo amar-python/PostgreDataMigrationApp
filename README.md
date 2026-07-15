@@ -1,4 +1,50 @@
-# T&E Database Framework
+# Migration Evaluation Platform (MEP) v2
+
+> **MEP** is a web application that wraps the existing CSV → PostgreSQL migration engine
+> with a **React frontend** and a **FastAPI backend**, turning a powerful CLI/script-based
+> tool into an interactive platform for **uploading CSV files, running migrations, and
+> evaluating migration quality** (completeness, integrity, business-rule conformance, and
+> reconciliation reporting).
+
+[![Status](https://img.shields.io/badge/MEP-v2%20(in%20development)-blueviolet)](#)
+[![Backend](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](#)
+[![Frontend](https://img.shields.io/badge/Frontend-React-61DAFB?logo=react&logoColor=white)](#)
+[![Engine](https://img.shields.io/badge/Engine-CSV%20%E2%86%92%20PostgreSQL-336791?logo=postgresql&logoColor=white)](backend/migration/)
+
+## What MEP Is
+
+The **Migration Evaluation Platform** does not replace the proven migration engine — it
+**wraps** it. The original, battle-tested SQL-first framework and CSV → PostgreSQL
+loader/validator pipeline now lives, unchanged, at **[`backend/migration/`](backend/migration/)**.
+The FastAPI backend shells out to / orchestrates that engine rather than reimplementing it,
+and a React frontend provides a UI for the full migrate-and-evaluate workflow.
+
+### Repository layout (MEP v2)
+
+```
+PostgreDataMigrationApp/
+├── backend/
+│   ├── api/            FastAPI routes (HTTP layer)
+│   ├── services/       Business logic
+│   ├── migration/      ← ORIGINAL migration engine (build/ evals/ infra/ tests/), preserved
+│   ├── evaluation/     Migration-quality evaluation logic
+│   ├── reports/        Reconciliation / evaluation report generation
+│   └── database/       MEP metadata models (MigrationRun, UploadedFile, ...)
+├── frontend/           React app
+├── docker/             Dockerfiles / compose
+├── docs/               Documentation
+├── uploads/            CSV upload staging
+└── .github/            CI workflows
+```
+
+> **Original engine:** everything that shipped before MEP — the multi-engine database
+> framework, the CSV pipeline, the 23 eval scenarios, the 85 SQL assertions, and the Azure
+> IaC — is preserved verbatim under **[`backend/migration/`](backend/migration/README.md)**.
+> The documentation below describes that original engine.
+
+---
+
+# T&E Database Framework (original engine — now under `backend/migration/`)
 
 > A fully parameterised, idempotent **PostgreSQL database framework** for **Test & Evaluation (T&E)** programme management — covering TEMP documents, VCRM traceability, test execution, defect reporting, and multi-environment deployment, with a built-in SQL test suite.
 

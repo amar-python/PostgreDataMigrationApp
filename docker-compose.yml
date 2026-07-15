@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: mep_db
+    environment:
+      POSTGRES_DB: mep_db
+      POSTGRES_USER: mep_user
+      POSTGRES_PASSWORD: mep_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - mep_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mep_user -d mep_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mep_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://mep_user:mep_password@db:5432/mep_db
+      APP_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mep_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mep_pgdata:
