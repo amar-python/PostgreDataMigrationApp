@@ -36,6 +36,17 @@ jobs:
       - name: Evals — Tier P (offline validator scenarios)
         run: python3 evals/runner.py --tiers p --verbose
 
+      # Reports (incl. the VCRM gap report) are written to evals/reports/ and
+      # would otherwise vanish with the runner — keep them for auditability.
+      - name: Upload eval reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-reports-free-tier
+          path: evals/reports/
+          if-no-files-found: ignore
+          retention-days: 30
+
   # Full integration surface: Tier I deploys env_dev.sql twice (idempotency),
   # Tier S runs the 85-assertion SQL suite, then the PG-gated pytest tiers run.
   integration-postgres:
@@ -107,3 +118,12 @@ jobs:
 
       - name: Integration / e2e / parity tests
         run: pytest -m "e2e or integration or parity" tests/ -v
+
+      - name: Upload eval reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-reports-integration
+          path: evals/reports/
+          if-no-files-found: ignore
+          retention-days: 30
