@@ -80,4 +80,5 @@ docs/Phase0-Setup-Manual.docx
 docs/Phase0-Setup-Manual.pdf
 *.docx
 *.pdf
-.github/
+# .github/workflows/ci.yml — parked at docs/ci/ci.yml.pending (GitHub App lacks workflows permission)
+backend/uploads/

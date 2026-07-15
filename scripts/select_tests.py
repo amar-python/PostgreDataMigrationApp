@@ -24,18 +24,18 @@ NC     = "\033[0m"
 # Map of changed path patterns → pytest marks / files to run
 _RULES: list[tuple[str, str, str]] = [
     # (path_fragment, mark_expression, human_label)
-    ("build/csv/validator",      "unit or snapshot or regression",  "validator changed → unit + snapshot + regression"),
-    ("evals/runner",             "unit",                             "runner changed → unit"),
-    ("evals/gap_report",         "unit",                             "gap_report changed → unit"),
-    ("evals/datasets/",          "unit",                             "eval dataset changed → unit (tier_p)"),
-    ("evals/expected/",          "unit",                             "expected file changed → unit (tier_p)"),
-    ("build/environments/",      "integration or e2e or parity",    "env SQL changed → integration + parity"),
-    ("build/schema/",            "integration or e2e or parity",    "schema changed → integration + parity"),
-    ("tests/suites/",            "integration",                      "SQL test suite changed → integration"),
-    ("tests/test_",              "unit",                             "test file changed → unit"),
-    ("scripts/",                 "security",                         "scripts changed → security scan"),
-    ("build/adapters/",          "security",                         "adapter changed → security scan"),
-    ("build/csv/loader_",        "e2e",                              "loader changed → e2e"),
+    ("backend/migration/build/csv/validator", "unit or snapshot or regression", "validator changed → unit + snapshot + regression"),
+    ("backend/migration/evals/runner",       "unit",                           "runner changed → unit"),
+    ("backend/migration/evals/gap_report",   "unit",                           "gap_report changed → unit"),
+    ("backend/migration/evals/datasets/",    "unit",                           "eval dataset changed → unit (tier_p)"),
+    ("backend/migration/evals/expected/",    "unit",                           "expected file changed → unit (tier_p)"),
+    ("backend/migration/build/environments/","integration or e2e or parity",   "env SQL changed → integration + parity"),
+    ("backend/migration/build/schema/",      "integration or e2e or parity",   "schema changed → integration + parity"),
+    ("backend/migration/tests/suites/",      "integration",                    "SQL test suite changed → integration"),
+    ("backend/migration/tests/test_",        "unit",                           "test file changed → unit"),
+    ("scripts/",                             "security",                       "scripts changed → security scan"),
+    ("backend/migration/build/adapters/",    "security",                       "adapter changed → security scan"),
+    ("backend/migration/build/csv/loader_",  "e2e",                            "loader changed → e2e"),
 ]
 
 _DEFAULT_MARKS = "unit"  # always run at minimum when diff is unclear
@@ -64,7 +64,7 @@ def main() -> None:
 
     if not changed:
         print(f"  {YELLOW}No changed files detected — running default tier: {_DEFAULT_MARKS}{NC}")
-        print(f"\n  pytest -m \"{_DEFAULT_MARKS}\" tests/\n")
+        print(f"\n  pytest -m \"{_DEFAULT_MARKS}\" backend/migration/tests/\n")
         return
 
     print(f"  {DIM}Changed files:{NC}")
@@ -95,7 +95,7 @@ def main() -> None:
         print(f"    • {label}")
 
     print(f"\n  {GREEN}Recommended command:{NC}")
-    print(f"    pytest -m \"{mark_expr}\" tests/\n")
+    print(f"    pytest -m \"{mark_expr}\" backend/migration/tests/\n")
 
 
 if __name__ == "__main__":
