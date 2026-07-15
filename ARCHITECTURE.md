@@ -49,7 +49,15 @@ The three layers can break independently, so we keep them physically separate. T
 | `tests/run_all_tests.sql` | Master SQL test orchestrator |
 | `tests/run_tests.sh` | Bash wrapper that sources `config.local.env` |
 | `tests/run_python_tests.ps1` | Windows runner — invoked by the GitHub Actions workflow |
+| `tests/conftest.py` | pytest env-var isolation between tests |
 | `tests/test_csv_validator.py` | unittest for `build/csv/validator.py` |
+| `tests/test_csv_utilise.py` | unit tests for `build/csv_utilise.sh` argument parsing |
+| `tests/test_csv_loader_arbitrary_shapes.py` | integration: arbitrary CSV shapes through loader → PG (skips without PG) |
+| `tests/test_e2e_pipeline.py` | e2e: CSV → validate → load → verify (DB half skips without PG) |
+| `tests/test_parity.py` | cross-environment row-count / schema parity (skips without PG) |
+| `tests/test_regression.py` | pinned tests for previously found bug classes |
+| `tests/test_security.py` | static credential/SQL-pattern scans |
+| `tests/test_snapshot.py` | golden-file output comparisons (`tests/snapshots/`) |
 | `tests/test_evals_runner.py` | unittest for `evals/runner.py` itself |
 
 ### `evals/` — data-driven scenarios

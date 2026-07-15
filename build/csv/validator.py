@@ -25,9 +25,15 @@ YELLOW = '\033[1;33m'
 RED    = '\033[0;31m'
 NC     = '\033[0m'
 
+
 def log(msg):  print(f"{GREEN}  [validator OK]{NC} {msg}")
+
+
 def warn(msg): print(f"{YELLOW}  [validator WARN]{NC} {msg}")
+
+
 def err(msg):  print(f"{RED}  [validator ERR]{NC} {msg}", file=sys.stderr)
+
 
 # ── Read environment variables ────────────────────────────────────────────────
 CSV_FILE   = os.environ.get('CSV_FILE',   '')
@@ -36,7 +42,7 @@ SKIP_FILE  = os.environ.get('SKIP_FILE',  '')
 TABLE_NAME = os.environ.get('TABLE_NAME', 'unknown')
 
 # Validate required vars
-missing = [v for v in ('CSV_FILE','VALID_CSV','SKIP_FILE') if not os.environ.get(v)]
+missing = [v for v in ('CSV_FILE', 'VALID_CSV', 'SKIP_FILE') if not os.environ.get(v)]
 if missing:
     err(f"Missing required environment variables: {', '.join(missing)}")
     sys.exit(1)
