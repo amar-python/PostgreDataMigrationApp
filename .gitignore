@@ -73,3 +73,5 @@ uploads/*
 *.tfplan
 tfplan
 .terraform.lock.hcl
+docs/Phase0-Setup-Manual.docx
+docs/Phase0-Setup-Manual.pdf
