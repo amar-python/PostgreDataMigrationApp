@@ -1,0 +1,27 @@
+name: Python Validator Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  python-validator-tests:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run validator unit tests (PowerShell)
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File "backend/migration/tests/run_python_tests.ps1"

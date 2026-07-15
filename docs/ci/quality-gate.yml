@@ -1,0 +1,109 @@
+name: Quality Gate
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  # Fast, deterministic checks — no database, no network beyond pip.
+  free-tier:
+    name: free-tier (unit, lint, health, evals-p)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Unit / regression / security / snapshot tests
+        run: make test-free
+
+      - name: Lint (flake8 + bandit)
+        run: make lint
+
+      - name: Component health check
+        run: make health
+
+      - name: Evals — Tier P (offline validator scenarios)
+        run: python3 backend/migration/evals/runner.py --tiers p --verbose
+
+  # Full integration surface: Tier I deploys env_dev.sql twice (idempotency),
+  # Tier S runs the 85-assertion SQL suite, then the PG-gated pytest tiers run.
+  integration-postgres:
+    name: integration (postgres service)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Write CI database config
+        run: |
+          cat > backend/migration/build/config.local.env <<'EOF'
+          DB_ENGINE="postgresql"
+          PG_HOST="localhost"
+          PG_PORT="5432"
+          PG_SUPERUSER="postgres"
+          PG_SUPERUSER_PASSWORD="postgres"
+          PG_DB_DEV="te_mgmt_dev"
+          PG_SCHEMA_DEV="te_dev"
+          PG_DB_TEST="te_mgmt_test"
+          PG_SCHEMA_TEST="te_test"
+          EOF
+
+      # env_*.sql scripts do not create their databases — deploy_all.sh does that
+      # before invoking them (see build/te_core_schema.sql:41). Mirror it here.
+      - name: Create environment databases
+        run: |
+          for db in te_mgmt_dev te_mgmt_test; do
+            if [ -z "$(psql -d postgres -tA -c "SELECT 1 FROM pg_database WHERE datname = '$db'")" ]; then
+              psql -v ON_ERROR_STOP=1 -d postgres -c \
+                "CREATE DATABASE \"$db\" WITH OWNER = postgres ENCODING = 'UTF8' TEMPLATE = template0 CONNECTION LIMIT = -1"
+            fi
+          done
+
+      - name: Evals — Tiers P, I, S
+        run: python3 backend/migration/evals/runner.py --tiers p,i,s --verbose
+
+      - name: Deploy test environment (for cross-env parity)
+        run: psql -v ON_ERROR_STOP=1 -f backend/migration/build/environments/env_test.sql
+
+      - name: Integration / e2e / parity tests
+        run: pytest -m "e2e or integration or parity" backend/migration/tests/ -v
