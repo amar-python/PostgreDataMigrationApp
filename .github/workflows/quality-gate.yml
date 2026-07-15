@@ -34,7 +34,7 @@ jobs:
         run: make health
 
       - name: Evals — Tier P (offline validator scenarios)
-        run: python3 evals/runner.py --tiers p --verbose
+        run: python3 backend/migration/evals/runner.py --tiers p --verbose
 
   # Full integration surface: Tier I deploys env_dev.sql twice (idempotency),
   # Tier S runs the 85-assertion SQL suite, then the PG-gated pytest tiers run.
@@ -76,7 +76,7 @@ jobs:
 
       - name: Write CI database config
         run: |
-          cat > build/config.local.env <<'EOF'
+          cat > backend/migration/build/config.local.env <<'EOF'
           DB_ENGINE="postgresql"
           PG_HOST="localhost"
           PG_PORT="5432"
@@ -100,10 +100,10 @@ jobs:
           done
 
       - name: Evals — Tiers P, I, S
-        run: python3 evals/runner.py --tiers p,i,s --verbose
+        run: python3 backend/migration/evals/runner.py --tiers p,i,s --verbose
 
       - name: Deploy test environment (for cross-env parity)
-        run: psql -v ON_ERROR_STOP=1 -f build/environments/env_test.sql
+        run: psql -v ON_ERROR_STOP=1 -f backend/migration/build/environments/env_test.sql
 
       - name: Integration / e2e / parity tests
-        run: pytest -m "e2e or integration or parity" tests/ -v
+        run: pytest -m "e2e or integration or parity" backend/migration/tests/ -v
