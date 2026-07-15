@@ -24,4 +24,4 @@ jobs:
 
       - name: Run validator unit tests (PowerShell)
         shell: pwsh
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File "backend/migration/tests/run_python_tests.ps1"
