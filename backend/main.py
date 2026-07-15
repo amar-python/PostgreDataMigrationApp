@@ -10,9 +10,10 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import health
+from api.routes import health, migrations
 from config import settings
-from database.connection import check_db_connection
+from database.connection import check_db_connection, engine
+from database.models import Base
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mep")
@@ -32,6 +33,7 @@ app.add_middleware(
 
 # Mount routers under the /api prefix.
 app.include_router(health.router, prefix="/api")
+app.include_router(migrations.router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -41,6 +43,9 @@ def on_startup() -> None:
     logger.info("Environment: %s | Debug: %s", settings.APP_ENV, settings.DEBUG)
     if check_db_connection():
         logger.info("Database connection: OK")
+        # Auto-create tables in dev (use Alembic migrations in production)
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables ensured")
     else:
         logger.warning("Database connection: UNAVAILABLE")
 

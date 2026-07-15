@@ -5,7 +5,6 @@ a session factory, a ``get_db`` context manager / FastAPI dependency, and a
 ``check_db_connection`` helper used by the health endpoint.
 """
 import logging
-from contextlib import contextmanager
 from typing import Generator
 
 from sqlalchemy import create_engine, text
@@ -33,12 +32,11 @@ SessionLocal = sessionmaker(
 )
 
 
-@contextmanager
 def get_db() -> Generator[Session, None, None]:
     """Yield a database session, ensuring it is closed afterwards.
 
-    Usable both as a context manager (``with get_db() as db:``) and as a
-    FastAPI dependency (``db: Session = Depends(get_db)``).
+    Usable as a FastAPI dependency: ``db: Session = Depends(get_db)``.
+    Also works with ``contextmanager`` wrapping when used outside FastAPI.
     """
     db = SessionLocal()
     try:
