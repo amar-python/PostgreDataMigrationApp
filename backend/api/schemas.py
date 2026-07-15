@@ -72,3 +72,101 @@ class DeleteResponse(BaseModel):
     """Generic deletion confirmation."""
     detail: str
     id: int
+
+
+# ---------------------------------------------------------------------------
+# Schema Discovery & Validation
+# ---------------------------------------------------------------------------
+
+class ColumnSchema(BaseModel):
+    """Inferred schema for a single CSV column."""
+    name: str
+    inferred_type: str
+    nullable: bool
+    unique: bool
+    sample_values: list[str]
+    null_count: int
+    total_count: int
+
+
+class ValidationIssue(BaseModel):
+    """A single validation finding."""
+    severity: str  # error | warning | info
+    check: str
+    column: Optional[str]
+    message: str
+
+
+class FileValidationResult(BaseModel):
+    """Schema + validation results for one uploaded file."""
+    file_id: int
+    filename: str
+    schema_info: list[ColumnSchema] = Field(default_factory=list, alias="schema")
+    issues: list[ValidationIssue]
+
+    model_config = {"populate_by_name": True}
+
+
+class ValidationSummary(BaseModel):
+    """Aggregate counts across all files."""
+    total_files: int
+    errors: int
+    warnings: int
+    passed: bool
+
+
+class ValidationResponse(BaseModel):
+    """Full validation response for a migration run."""
+    run_id: int
+    status: str
+    files: list[FileValidationResult]
+    summary: ValidationSummary
+
+
+# ---------------------------------------------------------------------------
+# Migration Execution
+# ---------------------------------------------------------------------------
+
+class MigrationExecuteResponse(BaseModel):
+    """Response after executing migration."""
+    run_id: int
+    status: str
+    files: list[dict]
+    summary: dict
+
+
+# ---------------------------------------------------------------------------
+# Evaluation
+# ---------------------------------------------------------------------------
+
+class EvaluationResponse(BaseModel):
+    """Evaluation quality-check response."""
+    run_id: int
+    status: str
+    files: list[dict]
+    summary: dict
+
+
+# ---------------------------------------------------------------------------
+# Reports
+# ---------------------------------------------------------------------------
+
+class ReportResponse(BaseModel):
+    """Report metadata."""
+    run_id: int
+    format: str
+    download_url: str
+
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+
+class DashboardStats(BaseModel):
+    """Dashboard summary statistics."""
+    total_runs: int
+    runs_by_status: dict[str, int]
+    total_files: int
+    total_rows: int
+    total_size: int
+    recent_runs: list[MigrationRunResponse]

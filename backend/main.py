@@ -10,7 +10,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import health, migrations
+from api.routes import health, migrations, validation, execution, reports, dashboard
 from config import settings
 from database.connection import check_db_connection, engine
 from database.models import Base
@@ -34,6 +34,10 @@ app.add_middleware(
 # Mount routers under the /api prefix.
 app.include_router(health.router, prefix="/api")
 app.include_router(migrations.router, prefix="/api")
+app.include_router(validation.router, prefix="/api")
+app.include_router(execution.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 
 
 @app.on_event("startup")

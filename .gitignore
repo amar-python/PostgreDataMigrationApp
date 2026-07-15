@@ -68,6 +68,9 @@ __pycache__/
 # CSV upload staging (keep the directory, ignore its contents)
 uploads/*
 !uploads/.gitkeep
+reports/
+*.db
+test_*.db
 
 # Terraform plan artifacts (binary, environment-specific, never commit)
 *.tfplan
@@ -75,3 +78,5 @@ tfplan
 .terraform.lock.hcl
 docs/Phase0-Setup-Manual.docx
 docs/Phase0-Setup-Manual.pdf
+*.docx
+*.pdf

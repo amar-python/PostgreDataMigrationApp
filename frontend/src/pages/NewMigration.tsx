@@ -413,8 +413,8 @@ export default function NewMigration() {
                 <Typography variant="h5">{totalRows.toLocaleString()}</Typography>
               </Box>
             </Box>
-            <Alert severity="info">
-              Upload complete. In future phases, you'll proceed to Schema Discovery → Validation → Migration from here.
+            <Alert severity="success">
+              Upload complete! Next: go to <strong>Validation</strong> to discover schemas and run data-quality checks, then proceed to migration.
             </Alert>
             <Button
               variant="outlined"
