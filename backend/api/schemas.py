@@ -11,6 +11,24 @@ from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
+# Service Meta (root & health)
+# ---------------------------------------------------------------------------
+
+class RootResponse(BaseModel):
+    """Root route payload confirming the API is running."""
+    message: str
+    version: str
+
+
+class HealthResponse(BaseModel):
+    """Health-check payload."""
+    status: str = Field(..., examples=["healthy"])
+    version: str
+    environment: str
+    database: str = Field(..., examples=["connected", "disconnected"])
+
+
+# ---------------------------------------------------------------------------
 # Migration Run
 # ---------------------------------------------------------------------------
 

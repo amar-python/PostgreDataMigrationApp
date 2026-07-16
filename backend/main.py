@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import health, migrations, validation, execution, reports, dashboard
+from api.schemas import RootResponse
 from config import settings
 from database.connection import check_db_connection, engine
 from database.models import Base
@@ -47,14 +48,19 @@ def on_startup() -> None:
     logger.info("Environment: %s | Debug: %s", settings.APP_ENV, settings.DEBUG)
     if check_db_connection():
         logger.info("Database connection: OK")
-        # Auto-create tables in dev (use Alembic migrations in production)
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables ensured")
+        if settings.ALLOW_SCHEMA_AUTO_CREATE:
+            # Auto-create tables in dev only. Production must use explicit
+            # migrations; config.Settings refuses to start with this flag
+            # enabled when APP_ENV=production.
+            Base.metadata.create_all(bind=engine)
+            logger.info("Database tables ensured (schema auto-create enabled)")
+        else:
+            logger.info("Schema auto-create disabled; expecting managed migrations")
     else:
         logger.warning("Database connection: UNAVAILABLE")
 
 
-@app.get("/")
-def root() -> dict:
+@app.get("/", response_model=RootResponse)
+def root() -> RootResponse:
     """Root route confirming the API is running."""
-    return {"message": "MEP API is running", "version": VERSION}
+    return RootResponse(message="MEP API is running", version=VERSION)
