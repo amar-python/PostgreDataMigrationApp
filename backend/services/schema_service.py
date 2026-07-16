@@ -244,7 +244,7 @@ def validate_run(db: Session, run_id: int) -> Optional[dict]:
     if not run:
         return None
 
-    run.status = RunStatus.VALIDATING
+    run.transition_to(RunStatus.VALIDATING)
     db.commit()
 
     files = (
@@ -254,7 +254,8 @@ def validate_run(db: Session, run_id: int) -> Optional[dict]:
     )
 
     if not files:
-        run.status = RunStatus.CREATED
+        # Nothing to validate — revert to CREATED (pre-upload state)
+        run.transition_to(RunStatus.CREATED)
         db.commit()
         return {
             "run_id": run_id,
@@ -300,8 +301,9 @@ def validate_run(db: Session, run_id: int) -> Optional[dict]:
         })
 
     passed = total_errors == 0
-    # Revert to CREATED status (validation is a pre-check, not a final state)
-    run.status = RunStatus.CREATED if passed else RunStatus.CREATED
+    # Lifecycle: validation passed → READY (eligible for execution);
+    # validation failed → ERROR (must fix files and re-validate).
+    run.transition_to(RunStatus.READY if passed else RunStatus.ERROR)
     db.commit()
 
     return {

@@ -26,7 +26,9 @@ import { formatFileSize, formatDate } from '../utils/format';
 const statusColor = (s: string): 'default' | 'primary' | 'success' | 'error' | 'warning' | 'info' => {
   switch (s) {
     case 'completed': return 'success';
-    case 'failed': return 'error';
+    case 'ready': return 'primary';
+    case 'failed':
+    case 'error': return 'error';
     case 'migrating':
     case 'validating': return 'warning';
     case 'uploading': return 'info';

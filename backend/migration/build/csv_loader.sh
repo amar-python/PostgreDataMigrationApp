@@ -89,6 +89,13 @@ done
 [[ -z "$CSV_FILE" ]] && { error "No CSV file specified."; usage; }
 [[ ! -f "$CSV_FILE" ]] && { error "File not found: $CSV_FILE"; exit 1; }
 
+# Validate the env token: it is interpolated into variable names by the engine
+# adapters (some via eval), so it must never contain shell metacharacters.
+if [[ ! "$TARGET_ENV" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+   error "Invalid --env value: '${TARGET_ENV}'. Allowed: letters, digits, underscore."
+   exit 1
+fi
+
 # ── Load configuration ────────────────────────────────────────────────────────
 if [[ -f "$CONFIG_LOCAL" ]]; then
    source "$CONFIG_LOCAL"
@@ -117,6 +124,20 @@ TABLE_NAME="${TABLE_OVERRIDE:-${BASENAME%.csv}}"
 TABLE_NAME="${TABLE_NAME%.CSV}"
 # Sanitise: lowercase, replace spaces/hyphens with underscores
 TABLE_NAME="$(echo "$TABLE_NAME" | tr '[:upper:]' '[:lower:]' | tr ' -' '__')"
+
+# ── Validate table identifier (blocks `;`, `--`, quotes, spaces, etc.) ───────
+# The table name is interpolated into generated SQL, so it must be a strict
+# SQL identifier: letters/digits/underscore, not starting with a digit.
+if [[ ! "$TABLE_NAME" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+   error "Invalid table name derived from input: '${TABLE_NAME}'."
+   error "Allowed: letters, digits, underscore; must not start with a digit."
+   error "Rename the CSV file or pass a safe name with --table <name>."
+   exit 1
+fi
+if [[ "${#TABLE_NAME}" -gt 63 ]]; then
+   error "Table name '${TABLE_NAME}' exceeds PostgreSQL's 63-character identifier limit."
+   exit 1
+fi
 
 # ── Setup log directory and files ─────────────────────────────────────────────
 mkdir -p "$LOG_DIR"
