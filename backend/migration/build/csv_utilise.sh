@@ -146,12 +146,21 @@ if [[ "$DB_ENGINE" != "postgresql" ]]; then
 fi
 
 # ── Resolve PostgreSQL connection details ────────────────────────────────────
+# Validate the env token first: it is used to build variable names, so it must
+# never contain shell metacharacters (blocks `--env 'x; rm -rf ~'` style abuse).
+if [[ ! "$TARGET_ENV" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+   error "Invalid --env value: '${TARGET_ENV}'. Allowed: letters, digits, underscore."
+   exit 1
+fi
 E="${TARGET_ENV^^}"
 PG_HOST="${PGHOST:-${PG_HOST:-localhost}}"
 PG_PORT="${PGPORT:-${PG_PORT:-5432}}"
 PG_USER="${PGUSER:-${PG_SUPERUSER:-postgres}}"
-DB_NAME="$(eval echo "\$PG_DB_${E}")"
-SCHEMA="$(eval echo "\$PG_SCHEMA_${E}")"
+# Indirect expansion instead of eval — no code execution path.
+_db_var="PG_DB_${E}"
+_schema_var="PG_SCHEMA_${E}"
+DB_NAME="${!_db_var:-}"
+SCHEMA="${!_schema_var:-}"
 
 if [[ -z "$DB_NAME" || -z "$SCHEMA" ]]; then
    error "Could not resolve database / schema for env '${TARGET_ENV}'."

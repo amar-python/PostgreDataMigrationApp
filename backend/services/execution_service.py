@@ -100,7 +100,7 @@ def execute_migration(db: Session, run_id: int) -> Optional[dict[str, Any]]:
     if not run:
         return None
 
-    run.status = RunStatus.MIGRATING
+    run.transition_to(RunStatus.MIGRATING)
     db.commit()
 
     files = (
@@ -110,7 +110,7 @@ def execute_migration(db: Session, run_id: int) -> Optional[dict[str, Any]]:
     )
 
     if not files:
-        run.status = RunStatus.CREATED
+        run.transition_to(RunStatus.CREATED)
         db.commit()
         return {
             "run_id": run_id,
@@ -178,7 +178,7 @@ def execute_migration(db: Session, run_id: int) -> Optional[dict[str, Any]]:
                 "rows_loaded": 0,
             })
 
-    run.status = RunStatus.COMPLETED if not has_error else RunStatus.FAILED
+    run.transition_to(RunStatus.COMPLETED if not has_error else RunStatus.FAILED)
     db.commit()
 
     return {

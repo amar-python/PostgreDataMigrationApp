@@ -3,9 +3,7 @@
 Keeps route handlers thin: they delegate to functions here, which interact
 with the ORM models and the filesystem.
 """
-import csv
-import io
-import json
+import logging
 import os
 import uuid
 from typing import Optional
@@ -14,6 +12,9 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from database.models import MigrationRun, RunStatus, UploadedFile
+from services.csv_parser import CsvParser
+
+logger = logging.getLogger("mep.migration_service")
 
 # Upload directory — relative to the backend working dir, mounted via Docker
 UPLOAD_DIR = os.environ.get("MEP_UPLOAD_DIR", os.path.join(os.getcwd(), "uploads"))
@@ -82,69 +83,80 @@ def delete_run(db: Session, run_id: int) -> bool:
 # ---------------------------------------------------------------------------
 
 def _parse_csv_metadata(content: bytes, filename: str) -> dict:
-    """Quickly parse CSV content to extract row count, column count, and column names."""
-    result = {"row_count": None, "column_count": None, "columns": None}
-    try:
-        text = content.decode("utf-8-sig")  # handles BOM
-        reader = csv.reader(io.StringIO(text))
-        headers = next(reader, None)
-        if headers:
-            result["columns"] = json.dumps([h.strip() for h in headers])
-            result["column_count"] = len(headers)
-            # Count data rows (excluding header)
-            row_count = sum(1 for _ in reader)
-            result["row_count"] = row_count
-    except Exception:
-        pass  # non-fatal — metadata is optional
-    return result
+    """Parse CSV content to extract row count, column count, and column names.
+
+    Delegates to the robust ``CsvParser``; parse problems are logged (not
+    swallowed silently) and reflected as None metadata, which surfaces to the
+    UI as "unknown" rather than pretending the file is fine.
+    """
+    parsed = CsvParser().parse(content, filename)
+    for issue in parsed.issues:
+        logger.warning("CSV %s [%s/%s]: %s", filename, issue.severity, issue.check, issue.message)
+    return {
+        "row_count": parsed.row_count,
+        "column_count": parsed.column_count,
+        "columns": parsed.columns_json(),
+    }
 
 
 async def upload_file(db: Session, run_id: int, file: UploadFile) -> Optional[UploadedFile]:
     """Save an uploaded file to disk and create a DB record.
 
     Returns the UploadedFile object, or None if the run doesn't exist.
+    If the upload fails mid-way (disk error, DB error, client disconnect),
+    the run is flagged as ERROR so it never lingers in UPLOADING.
     """
     run = get_run(db, run_id)
     if not run:
         return None
 
-    # Read file content
-    content = await file.read()
-    file_size = len(content)
+    try:
+        # Read file content
+        content = await file.read()
+        file_size = len(content)
 
-    # Generate a unique stored filename to avoid collisions
-    ext = os.path.splitext(file.filename or "file.csv")[1]
-    stored_name = f"{uuid.uuid4().hex}{ext}"
+        # Generate a unique stored filename to avoid collisions
+        ext = os.path.splitext(file.filename or "file.csv")[1]
+        stored_name = f"{uuid.uuid4().hex}{ext}"
 
-    # Save to disk
-    run_dir = _ensure_upload_dir(run_id)
-    file_path = os.path.join(run_dir, stored_name)
-    with open(file_path, "wb") as f:
-        f.write(content)
+        # Save to disk
+        run_dir = _ensure_upload_dir(run_id)
+        file_path = os.path.join(run_dir, stored_name)
+        with open(file_path, "wb") as f:
+            f.write(content)
 
-    # Parse CSV metadata
-    meta = _parse_csv_metadata(content, file.filename or "unknown.csv")
+        # Parse CSV metadata
+        meta = _parse_csv_metadata(content, file.filename or "unknown.csv")
 
-    # Persist to DB
-    uploaded = UploadedFile(
-        migration_run_id=run_id,
-        original_filename=file.filename or "unknown.csv",
-        stored_filename=stored_name,
-        file_size=file_size,
-        content_type=file.content_type or "text/csv",
-        row_count=meta["row_count"],
-        column_count=meta["column_count"],
-        columns=meta["columns"],
-    )
-    db.add(uploaded)
+        # Persist to DB
+        uploaded = UploadedFile(
+            migration_run_id=run_id,
+            original_filename=file.filename or "unknown.csv",
+            stored_filename=stored_name,
+            file_size=file_size,
+            content_type=file.content_type or "text/csv",
+            row_count=meta["row_count"],
+            column_count=meta["column_count"],
+            columns=meta["columns"],
+        )
+        db.add(uploaded)
 
-    # Update run status to UPLOADING if still CREATED
-    if run.status == RunStatus.CREATED:
-        run.status = RunStatus.UPLOADING
+        # Move the run (back) into UPLOADING for any state that allows it —
+        # a fresh run, a recovered ERROR/FAILED run, or a READY run receiving
+        # additional files (which must then be re-validated).
+        if run.status in (RunStatus.CREATED, RunStatus.ERROR, RunStatus.FAILED, RunStatus.READY):
+            run.transition_to(RunStatus.UPLOADING)
 
-    db.commit()
-    db.refresh(uploaded)
-    return uploaded
+        db.commit()
+        db.refresh(uploaded)
+        return uploaded
+    except Exception:
+        # Flag the run as ERROR — an upload died mid-way.
+        logger.exception("Upload failed mid-way for run %s; flagging run as ERROR", run_id)
+        db.rollback()
+        run.transition_to(RunStatus.ERROR)
+        db.commit()
+        raise
 
 
 def list_files(db: Session, run_id: int) -> list[UploadedFile]:
