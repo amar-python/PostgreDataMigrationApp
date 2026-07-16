@@ -24,18 +24,120 @@ and a React frontend provides a UI for the full migrate-and-evaluate workflow.
 ```
 PostgreDataMigrationApp/
 ├── backend/
-│   ├── api/            FastAPI routes (HTTP layer)
-│   ├── services/       Business logic
+│   ├── api/            FastAPI routes (HTTP layer) — all endpoints declare Pydantic response models
+│   ├── services/       Business logic (incl. the hardened CsvParser)
 │   ├── migration/      ← ORIGINAL migration engine (build/ evals/ infra/ tests/), preserved
 │   ├── evaluation/     Migration-quality evaluation logic
 │   ├── reports/        Reconciliation / evaluation report generation
-│   └── database/       MEP metadata models (MigrationRun, UploadedFile, ...)
+│   ├── database/       MEP metadata models (MigrationRun, UploadedFile, run lifecycle state machine)
+│   └── tests/          MEP backend test suite (unit + integration)
 ├── frontend/           React app
+├── tools/              Developer/CI tooling (workflow path verifier)
 ├── docker/             Dockerfiles / compose
-├── docs/               Documentation
+├── docs/               Documentation (incl. docs/security/ and docs/ci/)
 ├── uploads/            CSV upload staging
-└── .github/            CI workflows
+└── .github/            CI workflows + pull request template
 ```
+
+---
+
+## MEP Backend — Reliability & Safety Features
+
+The MEP layer ships with a set of code-quality and operational-safety guarantees
+(introduced via PRs [#10](https://github.com/amar-python/PostgreDataMigrationApp/pull/10),
+[#11](https://github.com/amar-python/PostgreDataMigrationApp/pull/11), and
+[#12](https://github.com/amar-python/PostgreDataMigrationApp/pull/12)):
+
+### Migration run lifecycle (state machine)
+
+Every `MigrationRun` moves through an explicit, enforced state machine defined in
+`backend/database/models.py`:
+
+```
+CREATED → UPLOADING → VALIDATING → READY → MIGRATING → COMPLETED
+              ↓            ↓                    ↓
+            ERROR        ERROR               FAILED
+```
+
+- States: `CREATED`, `UPLOADING`, `VALIDATING`, `READY`, `MIGRATING`, `COMPLETED`, `FAILED`, `ERROR`
+- Transitions are whitelisted in `ALLOWED_TRANSITIONS`; illegal jumps raise
+  `InvalidStateTransition` instead of silently corrupting run state
+- Failed uploads/validations land in `ERROR`, from which a re-upload can recover
+- The dashboard UI colour-codes `ready` and `error` states
+
+### Robust CSV parsing (`backend/services/csv_parser.py`)
+
+Uploads are parsed by a dedicated `CsvParser` service that returns a structured
+`CsvParseResult` with per-issue diagnostics instead of crashing:
+
+- Zero-byte / header-only files are rejected with a clear issue message
+- Ragged rows (column-count mismatches) are detected and reported
+- Encoding fallback: UTF-8 (with/without BOM) first, then latin-1
+- Suspicious headers (e.g. SQL metacharacters) are flagged before any data
+  reaches the database
+
+### Production safety gate
+
+The backend refuses to start unsafely in production:
+
+- `ALLOW_SCHEMA_AUTO_CREATE` (default `true` for development) controls whether
+  startup runs `Base.metadata.create_all`
+- If `APP_ENV=production` **and** `ALLOW_SCHEMA_AUTO_CREATE=true`, `Settings`
+  validation fails fast at startup — production schema changes must go through
+  explicit, reviewed migrations (e.g. Alembic), never auto-creation
+- Covered by `backend/tests/test_config_safety.py`
+
+### Typed API responses
+
+Every FastAPI endpoint declares a Pydantic `response_model`
+(`backend/api/schemas.py`) — including `/`, `/api/health`, `/api/dashboard`,
+execute/evaluate, and report generation. This documents the OpenAPI contract
+and filters internal fields (e.g. server filesystem paths are never leaked in
+report responses).
+
+### Hardened shell scripts
+
+The CSV loader scripts under `backend/migration/build/` validate their inputs:
+
+- Table names must match `^[a-zA-Z_][a-zA-Z0-9_]*$` and PostgreSQL's 63-char limit
+- `--env` values are validated against the known environment list
+- `eval` was replaced with safe indirect variable expansion (`${!var}`)
+
+### CI workflow path verification
+
+`tools/verify_workflow_paths.py` (stdlib-only) parses every GitHub Actions
+workflow and verifies that all referenced scripts, files, and directories
+actually exist in the repository — catching stale paths after refactors before
+CI does. It runs as a CI job (staged in `docs/ci/quality-gate.yml`) and locally:
+
+```bash
+python3 tools/verify_workflow_paths.py
+```
+
+### Security suppression policy
+
+Every `# nosec` / `# noqa` suppression in the codebase is documented with a
+technical justification in **[`docs/security/Rationale.md`](docs/security/Rationale.md)**.
+New suppressions must add an entry there (enforced via the PR template checklist).
+
+### Running the MEP backend tests
+
+```bash
+# From the repo root (backend suite: unit + lifecycle + parser + config safety)
+pip install -r backend/requirements.txt -r requirements-dev.txt
+python -m pytest backend/tests/
+
+# Integration smoke tests only
+python -m pytest backend/tests/ -m integration
+
+# Legacy engine tests
+python -m pytest backend/migration/tests/
+```
+
+With all three quality PRs applied, the backend suite has grown from 38 to
+100+ tests: 28 `CsvParser` tests, run-lifecycle state-machine tests,
+7 production-safety-gate tests, and API integration smoke tests — alongside the
+original engine's 85 SQL assertions and 23 CSV eval scenarios described below.
 
 > **Original engine:** everything that shipped before MEP — the multi-engine database
 > framework, the CSV pipeline, the 23 eval scenarios, the 85 SQL assertions, and the Azure
@@ -52,7 +154,7 @@ PostgreDataMigrationApp/
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Environments](https://img.shields.io/badge/Environments-Dev%20%7C%20Test%20%7C%20Staging%20%7C%20Prod-blue)](#environment-comparison)
 [![Test Suites](https://img.shields.io/badge/Tests-5%20suites%20%7C%2085%20assertions-brightgreen)](#test-suite)
-[![Evals](https://img.shields.io/badge/Evals-23%20CSV%20scenarios-brightgreen)](evals/)
+[![Evals](https://img.shields.io/badge/Evals-23%20CSV%20scenarios-brightgreen)](backend/migration/evals/)
 [![Terraform](https://img.shields.io/badge/Terraform-1.5%2B-7B42BC?logo=terraform&logoColor=white)](https://developer.hashicorp.com/terraform)
 
 ---
@@ -86,10 +188,15 @@ All names (database, schema, users, every table) are controlled by a single `\se
 
 ## Repository Structure
 
-The project is organised into three categories: `build/` (everything that ships), `tests/` (correctness coverage), `evals/` (data-driven black-box scenarios). See **`ARCHITECTURE.md`** for the rationale.
+The engine is organised into three categories: `build/` (everything that ships), `tests/` (correctness coverage), `evals/` (data-driven black-box scenarios). See **`ARCHITECTURE.md`** for the rationale.
+
+> **Note:** in MEP v2 the entire engine tree below lives under
+> **`backend/migration/`** (e.g. `backend/migration/build/`,
+> `backend/migration/tests/`, `backend/migration/evals/`). All commands in the
+> sections that follow use the full `backend/migration/...` paths.
 
 ```text
-PostgreDataMigrationApp/
+backend/migration/
 │
 ├── build/                             ← everything that ships
 │   ├── te_core_schema.sql             ← PostgreSQL master schema (legacy entry point)
@@ -158,9 +265,10 @@ PostgreDataMigrationApp/
 │   ├── expected/tier_*/               ← Expected outcomes
 │   └── reports/                       ← Runtime output (gitignored)
 │
-├── ARCHITECTURE.md                    ← The three-layer model
-├── README.md  LICENSE  .gitignore
+└── README.md                          ← Engine-level documentation
 ```
+
+(`ARCHITECTURE.md`, `LICENSE`, and `.gitignore` live at the repository root.)
 
 ---
 
@@ -249,7 +357,7 @@ cd PostgreDataMigrationApp
 ### 2. Run the interactive setup wizard
 
 ```bash
-cd build
+cd backend/migration/build
 chmod +x setup.sh
 ./setup.sh
 ```
@@ -284,19 +392,19 @@ Or skip the wizard and accept all defaults:
 
 ```bash
 # Dev only (includes realistic seed data)
-psql -U postgres -f build/environments/env_dev.sql
+psql -U postgres -f backend/migration/build/environments/env_dev.sql
 
 # Or deploy all 4 environments at once
-chmod +x build/deploy_all.sh
-./build/deploy_all.sh
+chmod +x backend/migration/build/deploy_all.sh
+./backend/migration/build/deploy_all.sh
 ```
 
 ### 3. Run the test suite
 
 ```bash
-chmod +x tests/run_tests.sh
-./tests/run_tests.sh dev        # test Dev
-./tests/run_tests.sh            # test all 4 environments
+chmod +x backend/migration/tests/run_tests.sh
+./backend/migration/tests/run_tests.sh dev        # test Dev
+./backend/migration/tests/run_tests.sh            # test all 4 environments
 ```
 
 ### 4. Connect and explore
@@ -320,16 +428,16 @@ ORDER  BY r.req_identifier;
 
 ```bash
 # Load into the engine from config.local.env
-./csv_loader.sh data/customers.csv
+./backend/migration/build/csv_loader.sh data/customers.csv
 
 # Specify engine/environment
-./csv_loader.sh data/orders.csv --engine postgresql --env dev
+./backend/migration/build/csv_loader.sh data/orders.csv --engine postgresql --env dev
 
 # Validate only
-./csv_loader.sh data/products.csv --engine sqlite --dry-run
+./backend/migration/build/csv_loader.sh data/products.csv --engine sqlite --dry-run
 
 # Override the target table name
-./csv_loader.sh data/export_2025.csv --engine mariadb --table invoices
+./backend/migration/build/csv_loader.sh data/export_2025.csv --engine mariadb --table invoices
 ```
 
 CSV inputs must have a header row, use comma delimiters, and be UTF-8 encoded with or without a BOM. The shared Python validator skips empty rows and row/header column-count mismatches, warns on duplicate headers, preserves quoted commas/newlines, and writes rejected rows with an `_skip_reason` column.
@@ -340,7 +448,7 @@ Supported loader backends are PostgreSQL, MariaDB/MySQL, SQLite, InfluxDB, Redis
 
 The loader is schema-agnostic — drop any CSV file in front of it and a matching table is auto-created in the target environment's database. Every CSV-loaded table is tagged with two marker columns: `_csv_row_id BIGSERIAL PRIMARY KEY` and `_loaded_at TIMESTAMPTZ`. All other columns start as `TEXT`; `ALTER TABLE` afterwards if you need stricter types.
 
-Three sample CSVs ship under `build/csv/samples/` (`customers.csv`, `orders.csv`, `inventory.csv`) — deliberately off-domain from the T&E schema to demonstrate that any shape is accepted.
+Three sample CSVs ship under `backend/migration/build/csv/samples/` (`customers.csv`, `orders.csv`, `inventory.csv`) — deliberately off-domain from the T&E schema to demonstrate that any shape is accepted.
 
 ```bash
 # Single-command happy-path proof (loads all three samples into dev, lists them)
@@ -350,12 +458,12 @@ make csv-demo
 make csv-load FILE=path/to/anything.csv          # ENV defaults to dev
 make csv-load FILE=path/to/anything.csv ENV=test ENGINE=postgresql
 
-# Use loaded data — companion script: build/csv_utilise.sh (PostgreSQL only)
-./build/csv_utilise.sh list                       # all CSV-loaded tables in the env
-./build/csv_utilise.sh describe customers         # columns + row count
-./build/csv_utilise.sh peek orders --limit 5      # first N rows
-./build/csv_utilise.sh export inventory dump.csv  # round-trip back to CSV
-./build/csv_utilise.sh drop customers --yes       # remove a CSV-loaded table
+# Use loaded data — companion script: backend/migration/build/csv_utilise.sh (PostgreSQL only)
+./backend/migration/build/csv_utilise.sh list                       # all CSV-loaded tables in the env
+./backend/migration/build/csv_utilise.sh describe customers         # columns + row count
+./backend/migration/build/csv_utilise.sh peek orders --limit 5      # first N rows
+./backend/migration/build/csv_utilise.sh export inventory dump.csv  # round-trip back to CSV
+./backend/migration/build/csv_utilise.sh drop customers --yes       # remove a CSV-loaded table
 ```
 
 `csv_utilise.sh` only sees tables that carry the marker columns, so it cannot accidentally touch the rigid te_core_schema tables.
@@ -403,7 +511,7 @@ Each environment is fully isolated. All four can run on the same PostgreSQL inst
 To deploy to a remote host:
 
 ```bash
-PGHOST=my-db-server PGPORT=5432 PGUSER=postgres ./build/deploy_all.sh staging
+PGHOST=my-db-server PGPORT=5432 PGUSER=postgres ./backend/migration/build/deploy_all.sh staging
 ```
 
 ---
@@ -488,19 +596,19 @@ Realistic Australian T&E data is loaded automatically when `include_seed_data` i
 
 ```bash
 # Against a single environment
-./tests/run_tests.sh dev
+./backend/migration/tests/run_tests.sh dev
 
 # Against all environments
-./tests/run_tests.sh
+./backend/migration/tests/run_tests.sh
 
 # Run Python tests
-python -m unittest discover -s tests -p "test*.py" -v
+python -m unittest discover -s backend/migration/tests -p "test*.py" -v
 
 # Run data-driven CSV validator evals
-python evals/runner.py --tiers p
+python backend/migration/evals/runner.py --tiers p
 
 # Run all eval tiers; PostgreSQL-backed tiers skip cleanly if PG is unavailable
-python evals/runner.py --tiers p,i,s
+python backend/migration/evals/runner.py --tiers p,i,s
 
 # Manually via psql
 psql -U postgres -d te_mgmt_dev \
@@ -517,19 +625,19 @@ psql -U postgres -d te_mgmt_dev \
   --set tbl_test_results=test_results \
   --set tbl_defect_reports=defect_reports \
   --set tbl_evidence_artifacts=evidence_artifacts \
-  -f tests/run_all_tests.sql
+  -f backend/migration/tests/run_all_tests.sql
 ```
 
 ```powershell
 # Windows/PowerShell runner for Python tests
-powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "backend/migration/tests/run_python_tests.ps1"
 # Optional: run a custom test path
-powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1" -TestPath "tests/test_csv_validator.py"
+powershell -NoProfile -ExecutionPolicy Bypass -File "backend/migration/tests/run_python_tests.ps1" -TestPath "backend/migration/tests/test_csv_validator.py"
 ```
 
 ### Windows / Cursor AI notes
 
-- `setup.sh`, `deploy_all.sh`, and `tests/run_tests.sh` are bash scripts.
+- `setup.sh`, `deploy_all.sh`, and `run_tests.sh` (all under `backend/migration/`) are bash scripts.
 - On Windows, run shell scripts via WSL2 or Git Bash.
 - The Python unit tests and Tier P evals are Windows-native and do not require WSL.
 - Tier I and Tier S evals require a reachable PostgreSQL instance and `psql` on PATH; if unavailable, they skip cleanly.
@@ -539,8 +647,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
 - Recommended Windows command:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
-python evals\runner.py --tiers p
+powershell -NoProfile -ExecutionPolicy Bypass -File "backend/migration/tests/run_python_tests.ps1"
+python backend\migration\evals\runner.py --tiers p
 ```
 
 ### CI validation (Windows)
@@ -553,7 +661,7 @@ A GitHub Actions workflow is included for Windows validation of the Python tests
 - Command executed:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "tests/run_python_tests.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "backend/migration/tests/run_python_tests.ps1"
 ```
 
 ### Data-driven evals
@@ -569,12 +677,12 @@ The `evals/` package complements the SQL and unit tests with scenario fixtures a
 Run examples:
 
 ```powershell
-python evals\runner.py                  # Tier P only
-python evals\runner.py --tiers p,i,s    # all tiers; I/S skip if PostgreSQL is unavailable
-python evals\runner.py --only 14_quoted_newline --tiers p
+python backend\migration\evals\runner.py                  # Tier P only
+python backend\migration\evals\runner.py --tiers p,i,s    # all tiers; I/S skip if PostgreSQL is unavailable
+python backend\migration\evals\runner.py --only 14_quoted_newline --tiers p
 ```
 
-Each eval run writes a JSON report under `evals/reports/<run_id>/summary.json`; that folder is intentionally gitignored.
+Each eval run writes a JSON report under `backend/migration/evals/reports/<run_id>/summary.json`; that folder is intentionally gitignored.
 
 ### Coverage — 85 assertions across 5 suites
 
@@ -745,18 +853,34 @@ terraform validate        # check configuration for errors
 
 ---
 
+## Contributing
+
 Contributions are welcome. Please follow these steps:
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/your-feature-name`
-3. Make your changes and add or update tests in `tests/suites/`
-4. Verify all 85 assertions still pass: `./tests/run_tests.sh dev`
-5. Open a Pull Request with a clear description of what changed and why
+3. Make your changes and add or update tests:
+   - MEP backend changes → `backend/tests/`
+   - Engine SQL changes → `backend/migration/tests/suites/`
+4. Verify everything still passes:
+   - Backend suite: `python -m pytest backend/tests/`
+   - Engine SQL assertions: `./backend/migration/tests/run_tests.sh dev`
+5. Verify CI workflow paths: `python3 tools/verify_workflow_paths.py`
+6. Open a Pull Request — the repository's
+   **[pull request template](.github/pull_request_template.md)** will pre-fill a
+   quality checklist. In particular, complete the **Tests Added** and
+   **Verified Workflow Paths** sections.
 
 **Guidelines:**
 
 - Keep the framework idempotent — every change must be safe to re-run
-- Add at least one test assertion for any new table column or constraint
+- Add at least one test (pytest or SQL assertion) for any new behaviour, table
+  column, or constraint
+- New/changed API endpoints must declare a Pydantic `response_model`
+- Run-status changes must go through the `RunStatus` lifecycle
+  (`ALLOWED_TRANSITIONS` in `backend/database/models.py`)
+- Do not add `# nosec` / `# noqa` suppressions without documenting them in
+  `docs/security/Rationale.md`
 - Follow the existing naming convention for tables (`tbl_*`), indexes (`idx_*`), and triggers (`trg_*`)
 - Do not commit passwords, real classified data, or environment-specific connection strings
 
@@ -765,132 +889,3 @@ Contributions are welcome. Please follow these steps:
 ## License
 
 MIT — see [LICENSE](LICENSE) for full text.
-
----
-
-## Acknowledgements
-
-Here are the prompts, distilled from every action I actually performed today. Each one is self-contained and would run end-to-end without follow-up questions.
-
----
-
-### Prompt 1 — Audit & Fix Stale Documentation
-
-```text
-Audit all markdown docs and requirements.txt against the current codebase.
-For each file, check that referenced functions, imports, file paths, test
-counts, and CLI commands still match the code. Fix anything stale in-place.
-Push to GitHub with a summary of what changed and why.
-
-Files to check: README.md, FIXES_APPLIED.md, VALIDATION_REPORT.md,
-NEW_USER_NAVIGATION_GUIDE.md, requirements.txt
-```
-
----
-
-### Prompt 2 — Generate Edge Case Datasets + Stress Tests
-
-```text
-Generate synthetic edge case CSV datasets in sample_data/edge_cases/ and
-write matching pytest tests in tests/test_edge_cases.py. Cover these cases:
-
-- UTF-8 BOM in headers
-- Tab-delimited (.tsv)
-- Duplicate primary keys
-- Header-only (empty) CSV
-- Unicode (CJK, accented, Polish characters)
-- Nulls in required columns (empty string, "NULL", "N/A")
-- Special characters (embedded commas, quotes, apostrophes)
-- Ragged rows (inconsistent column count)
-- Wrong/missing column headers
-- Over-length string values exceeding max_length
-- Large file (10,000 rows) with a performance assertion under 5 seconds
-- Missing/nonexistent file path
-
-Each test should use the project's existing JobConfig and pre_import stage.
-Run the full test suite to confirm everything passes, then push to GitHub.
-```
-
----
-
-### Prompt 3 — Run Tests + Generate Detailed Report for Lead
-
-```text
-Run the full pytest suite and create TEST_REPORT.md at the project root.
-The report must include:
-
-- Summary line: total / passed / failed / skipped
-- A table per test file with columns: #, Test name, Marker (unit/integration),
-  Status, What it verifies
-- A "Note for Lead" section explaining that integration tests need a live
-  PostgreSQL database configured via .env, and that running `pytest -m unit`
-  deselects them by marker filter (not skipped due to failure)
-- A test data table listing every dataset file and its purpose
-
-Push TEST_REPORT.md to GitHub.
-```
-
----
-
-### Prompt 4 — Repo Hygiene (one-shot cleanup)
-
-```text
-Clean up the GitHub repo (amar-python/TestUploadtoGIT) in one pass:
-
-1. If files exist at both root and a nested path (e.g. OneDrive/Desktop/...),
-   keep the latest version at root and git rm the nested duplicate entirely.
-2. Add .abacusai/, .claude/, and any other tool/session folders to .gitignore
-   and untrack them with git rm --cached.
-3. Prune the reports/ folder to keep only the 5 most recent timestamped run
-   directories and their matching logs. Delete the rest.
-4. Add an auto-pruning rule to src/reporting.py that deletes old runs
-   beyond MAX_REPORT_RUNS (default 5) after each write_summary() call.
-   Make the limit configurable via env var.
-
-Commit each logical change separately and push to master.
-```
-
----
-
-### Prompt 5 — Full Session (combines all of the above)
-
-```text
-I have a CSV-to-PostgreSQL migration framework at:
-C:\Users\User\OneDrive\Desktop\Migration using ai
-GitHub repo: amar-python/TestUploadtoGIT
-
-Do the following in order:
-
-1. AUDIT DOCS — Check all .md files and requirements.txt against the code.
-   Fix anything stale.
-
-2. EDGE CASE TESTS — Generate 11+ synthetic CSV datasets covering:
-   - BOM (Byte Order Mark — the hidden \xEF\xBB\xBF prefix Excel adds to
-     UTF-8 files that corrupts the first column header)
-   - Tab-delimited (.tsv)
-   - Unicode (CJK, accented, Polish characters)
-   - Nulls in required columns (empty string, "NULL", "N/A")
-   - Special characters (embedded commas, quotes, apostrophes)
-   - Ragged rows (inconsistent column count)
-   - Wrong/missing column headers
-   - Over-length string values exceeding max_length
-   - Large file (10,000 rows) with a performance assertion under 5 seconds
-   - Duplicate primary keys
-   - Empty file (header only)
-   Write matching pytest tests. Run the suite to confirm all pass.
-
-3. TEST REPORT — Create TEST_REPORT.md listing every test with status,
-   marker, and description. Include a note for the lead about integration
-   tests requiring PostgreSQL.
-
-4. REPO HYGIENE — Flatten any nested paths to root level. Add tool folders
-   to .gitignore and untrack them. Prune reports/ to 5 most recent runs
-   and add auto-pruning logic to src/reporting.py (MAX_REPORT_RUNS=5).
-
-5. PUSH — Commit each logical change separately and push to master.
-   Confirm the final repo structure.
-```
-
----
-
-The full session prompt (#5) would reproduce today's entire day of work in a single request. The individual prompts (#1-4)
