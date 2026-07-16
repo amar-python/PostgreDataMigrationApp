@@ -7,13 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from api.schemas import ReportResponse
 from database.connection import get_db
-from services import report_service, schema_service, execution_service, evaluation_service
+from services import report_service, schema_service, evaluation_service
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
-@router.post("/{run_id}/generate")
+# ``response_model=ReportResponse`` intentionally filters out the internal
+# ``path`` key returned by report_service so server filesystem paths are not
+# leaked to API clients (the frontend only consumes ``download_url``).
+@router.post("/{run_id}/generate", response_model=ReportResponse)
 def generate_report(
     run_id: int,
     format: str = Query("json", pattern="^(json|html)$"),
