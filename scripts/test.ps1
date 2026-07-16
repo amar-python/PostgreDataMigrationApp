@@ -3,7 +3,7 @@
 # Layers:
 #   1. pytest -m unit              (Python unit tests, no DB needed)
 #   2. SQL test suite              (5 suites against deployed env, needs PG)
-#   3. evals/runner.py             (Tier P offline + Tier I/S need PG)
+#   3. backend/migration/evals/runner.py             (Tier P offline + Tier I/S need PG)
 #
 # Usage:
 #   .\scripts\test.ps1                    # all three layers
@@ -72,12 +72,12 @@ try {
         } else {
             $TestRunner = Join-Path $ProjectRoot 'tests\run_tests.sh'
             if (Test-Path $TestRunner) {
-                & bash tests/run_tests.sh $Env
+                & bash backend/migration/tests/run_tests.sh $Env
                 $pass = $LASTEXITCODE -eq 0
                 Record -Layer 'sql suite' -Pass $pass -Detail "exit=$LASTEXITCODE"
                 Write-Host "[layer 2] $(if ($pass) {'PASS'} else {'FAIL'})" -ForegroundColor $(if ($pass) {'Green'} else {'Red'})
             } else {
-                Write-Host "[layer 2] SKIP: tests/run_tests.sh not found" -ForegroundColor Yellow
+                Write-Host "[layer 2] SKIP: backend/migration/tests/run_tests.sh not found" -ForegroundColor Yellow
                 Record -Layer 'sql suite' -Pass $true -Detail 'skipped: runner missing'
             }
         }
@@ -86,7 +86,7 @@ try {
     # --- Layer 3: evals ---
     if (-not ($SkipEvals -or $OnlyPython)) {
         Write-Host ""
-        Write-Host "[layer 3] evals/runner.py" -ForegroundColor Yellow
+        Write-Host "[layer 3] backend/migration/evals/runner.py" -ForegroundColor Yellow
         $Runner = Join-Path $ProjectRoot 'evals\runner.py'
         if (Test-Path $Runner) {
             $tiers = if ($env:PGHOST -and $env:PGPASSWORD) { 'p,i,s' } else { 'p' }
@@ -95,7 +95,7 @@ try {
             Record -Layer "evals ($tiers)" -Pass $pass -Detail "exit=$LASTEXITCODE"
             Write-Host "[layer 3] $(if ($pass) {'PASS'} else {'FAIL'})" -ForegroundColor $(if ($pass) {'Green'} else {'Red'})
         } else {
-            Write-Host "[layer 3] SKIP: evals/runner.py not found" -ForegroundColor Yellow
+            Write-Host "[layer 3] SKIP: backend/migration/evals/runner.py not found" -ForegroundColor Yellow
             Record -Layer 'evals' -Pass $true -Detail 'skipped: runner missing'
         }
     }

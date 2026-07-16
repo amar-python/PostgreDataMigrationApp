@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT        = Path(__file__).resolve().parents[1]
-REPORTS_DIR = ROOT / "evals" / "reports"
+REPORTS_DIR = ROOT / "backend" / "migration" / "evals" / "reports"
 
 GREEN  = "\033[0;32m"
 RED    = "\033[0;31m"

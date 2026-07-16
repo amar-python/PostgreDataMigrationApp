@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 ROOT        = Path(__file__).resolve().parents[1]
-REPORTS_DIR = ROOT / "evals" / "reports"
+REPORTS_DIR = ROOT / "backend" / "migration" / "evals" / "reports"
 
 GREEN  = "\033[0;32m"
 RED    = "\033[0;31m"
@@ -27,7 +27,7 @@ def main() -> None:
 
     runs = sorted(p for p in REPORTS_DIR.iterdir() if p.is_dir())
     if not runs:
-        print(f"{YELLOW}No eval runs found — run `python3 evals/runner.py` first.{NC}")
+        print(f"{YELLOW}No eval runs found — run `python3 backend/migration/evals/runner.py` first.{NC}")
         return
 
     total_runs = 0

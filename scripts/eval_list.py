@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""List all past eval runs stored in evals/reports/.
+"""List all past eval runs stored in backend/migration/evals/reports/.
 
 Mirrors `bun run eval:list` in gstack.
 """
@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 ROOT        = Path(__file__).resolve().parents[1]
-REPORTS_DIR = ROOT / "evals" / "reports"
+REPORTS_DIR = ROOT / "backend" / "migration" / "evals" / "reports"
 
 GREEN  = "\033[0;32m"
 RED    = "\033[0;31m"
@@ -22,7 +22,7 @@ NC     = "\033[0m"
 
 def main() -> None:
     if not REPORTS_DIR.exists():
-        print(f"{YELLOW}No eval reports found — run `python3 evals/runner.py` first.{NC}")
+        print(f"{YELLOW}No eval reports found — run `python3 backend/migration/evals/runner.py` first.{NC}")
         return
 
     runs = sorted(
