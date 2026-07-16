@@ -101,16 +101,16 @@ Test-Check 'psql on PATH' {
 Write-Host ""
 Write-Host "Project files" -ForegroundColor Cyan
 
-Test-Check 'in project root (build/, tests/, evals/ exist)' {
-    (Test-Path build) -and (Test-Path tests) -and (Test-Path evals)
+Test-Check 'in project root (backend/migration present)' {
+    (Test-Path backend/migration/build) -and (Test-Path backend/migration/tests) -and (Test-Path backend/migration/evals)
 } -FixHint 'cd into the PostgreDataMigrationApp folder before running this script'
 
-Test-Check 'evals/runner.py exists' {
-    Test-Path 'evals\runner.py'
+Test-Check 'backend/migration/evals/runner.py exists' {
+    Test-Path 'backend\migration\evals\runner.py'
 }
 
-Test-Check 'build/deploy_all.sh exists' {
-    Test-Path 'build\deploy_all.sh'
+Test-Check 'backend/migration/build/deploy_all.sh exists' {
+    Test-Path 'backend\migration\build\deploy_all.sh'
 }
 
 # ----- Git state -----

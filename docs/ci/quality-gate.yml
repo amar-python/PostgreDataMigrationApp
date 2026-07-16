@@ -8,6 +8,23 @@ on:
   pull_request:
 
 jobs:
+  # Guard rail: fail fast if any workflow step references a file or directory
+  # that no longer exists (e.g. after a repository restructure).
+  validation:
+    name: validation (workflow path references)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify workflow path references
+        run: python3 tools/verify_workflow_paths.py --verbose
+
   # Fast, deterministic checks — no database, no network beyond pip.
   free-tier:
     name: free-tier (unit, lint, health, evals-p)
@@ -89,7 +106,7 @@ jobs:
           EOF
 
       # env_*.sql scripts do not create their databases — deploy_all.sh does that
-      # before invoking them (see build/te_core_schema.sql:41). Mirror it here.
+      # before invoking them (see backend/migration/build/te_core_schema.sql:41). Mirror it here.
       - name: Create environment databases
         run: |
           for db in te_mgmt_dev te_mgmt_test; do

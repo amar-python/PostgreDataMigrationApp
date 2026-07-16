@@ -21,29 +21,29 @@ $ErrorActionPreference = "Stop"
 
 switch ($Target) {
     "test-free" {
-        pytest -m "unit or regression or security or snapshot" tests/ -v
+        pytest -m "unit or regression or security or snapshot" backend/migration/tests/ -v
     }
     "test-gate" {
-        pytest -m "unit or regression or security or snapshot" tests/ `
-            --cov=build/csv --cov=evals --cov-report=term-missing
+        pytest -m "unit or regression or security or snapshot" backend/migration/tests/ `
+            --cov=backend/migration/build/csv --cov=backend/migration/evals --cov-report=term-missing
     }
     "test-evals" {
-        python evals/runner.py --tiers p,i,s --verbose
+        python backend/migration/evals/runner.py --tiers p,i,s --verbose
     }
     "test-e2e" {
-        pytest -m "e2e or integration or parity" tests/ -v
+        pytest -m "e2e or integration or parity" backend/migration/tests/ -v
     }
     "test-all" {
-        pytest tests/ --cov=build/csv --cov=evals --cov-report=term-missing
-        python evals/runner.py --tiers p,i,s --verbose
+        pytest backend/migration/tests/ --cov=backend/migration/build/csv --cov=backend/migration/evals --cov-report=term-missing
+        python backend/migration/evals/runner.py --tiers p,i,s --verbose
     }
     "lint" {
         $pyFiles = @(
-            "build/csv/validator.py",
-            "evals/runner.py",
-            "evals/gap_report.py",
-            "tests/test_csv_validator.py",
-            "tests/test_evals_runner.py"
+            "backend/migration/build/csv/validator.py",
+            "backend/migration/evals/runner.py",
+            "backend/migration/evals/gap_report.py",
+            "backend/migration/tests/test_csv_validator.py",
+            "backend/migration/tests/test_evals_runner.py"
         )
         $scriptPy = Get-ChildItem scripts/*.py -ErrorAction SilentlyContinue |
             ForEach-Object { $_.FullName }

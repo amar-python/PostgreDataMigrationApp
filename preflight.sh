@@ -79,10 +79,10 @@ check 'psql on PATH'                opt 'Add PG client to PATH. brew install pos
 # ----- Project files -----
 echo
 echo "${C}Project files${X}"
-check 'in project root (build/ tests/ evals/)' req 'cd into the PostgreDataMigrationApp folder first' \
-      bash -c '[ -d build ] && [ -d tests ] && [ -d evals ]'
-check 'evals/runner.py exists'      req 'Project files missing/corrupt' test -f evals/runner.py
-check 'build/deploy_all.sh exists'  req 'Project files missing/corrupt' test -f build/deploy_all.sh
+check 'in project root (backend/migration present)' req 'cd into the PostgreDataMigrationApp folder first' \
+      bash -c '[ -d backend/migration/build ] && [ -d backend/migration/tests ] && [ -d backend/migration/evals ]'
+check 'backend/migration/evals/runner.py exists'      req 'Project files missing/corrupt' test -f backend/migration/evals/runner.py
+check 'backend/migration/build/deploy_all.sh exists'  req 'Project files missing/corrupt' test -f backend/migration/build/deploy_all.sh
 
 # ----- Git state -----
 echo

@@ -4,7 +4,7 @@
 # Layers:
 #   1. pytest -m unit              (Python unit tests)
 #   2. SQL test suite              (5 suites, needs PG)
-#   3. evals/runner.py             (Tier P offline + Tier I/S need PG)
+#   3. backend/migration/evals/runner.py             (Tier P offline + Tier I/S need PG)
 #
 # Usage:
 #   ./scripts/test.sh                       # all three
@@ -82,11 +82,11 @@ if [ "$SKIP_SQL" -eq 0 ] && [ "$ONLY_PYTHON" -eq 0 ]; then
     elif [ -z "${PGPASSWORD:-}" ]; then
         echo "${Y}[layer 2] SKIP: PGPASSWORD not set${X}"
         record "sql suite" PASS "skipped: env vars"
-    elif [ ! -f tests/run_tests.sh ]; then
-        echo "${Y}[layer 2] SKIP: tests/run_tests.sh missing${X}"
+    elif [ ! -f backend/migration/tests/run_tests.sh ]; then
+        echo "${Y}[layer 2] SKIP: backend/migration/tests/run_tests.sh missing${X}"
         record "sql suite" PASS "skipped: runner missing"
     else
-        if bash tests/run_tests.sh "$ENV_TARGET"; then
+        if bash backend/migration/tests/run_tests.sh "$ENV_TARGET"; then
             echo "${G}[layer 2] PASS${X}"
             record "sql suite" PASS "exit=0"
         else
@@ -99,16 +99,16 @@ fi
 # --- Layer 3: evals ---
 if [ "$SKIP_EVALS" -eq 0 ] && [ "$ONLY_PYTHON" -eq 0 ]; then
     echo
-    echo "${Y}[layer 3] evals/runner.py${X}"
-    if [ ! -f evals/runner.py ]; then
-        echo "${Y}[layer 3] SKIP: evals/runner.py missing${X}"
+    echo "${Y}[layer 3] backend/migration/evals/runner.py${X}"
+    if [ ! -f backend/migration/evals/runner.py ]; then
+        echo "${Y}[layer 3] SKIP: backend/migration/evals/runner.py missing${X}"
         record "evals" PASS "skipped: runner missing"
     else
         TIERS="p"
         if [ -n "${PGHOST:-}" ] && [ -n "${PGPASSWORD:-}" ]; then
             TIERS="p,i,s"
         fi
-        if python3 evals/runner.py --tiers "$TIERS"; then
+        if python3 backend/migration/evals/runner.py --tiers "$TIERS"; then
             echo "${G}[layer 3] PASS${X}"
             record "evals ($TIERS)" PASS "exit=0"
         else
