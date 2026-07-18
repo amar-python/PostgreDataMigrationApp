@@ -48,7 +48,7 @@ jobs:
           retention-days: 30
 
   # Full integration surface: Tier I deploys env_dev.sql twice (idempotency),
-  # Tier S runs the 85-assertion SQL suite, then the PG-gated pytest tiers run.
+  # Tier S runs the 142-assertion SQL suite, then the PG-gated pytest tiers run.
   integration-postgres:
     name: integration (postgres service)
     runs-on: ubuntu-latest
