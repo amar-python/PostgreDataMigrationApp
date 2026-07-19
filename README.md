@@ -5,7 +5,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13%2B-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Environments](https://img.shields.io/badge/Environments-Dev%20%7C%20Test%20%7C%20Staging%20%7C%20Prod-blue)](#environment-comparison)
-[![Test Suites](https://img.shields.io/badge/Tests-5%20suites%20%7C%2085%20assertions-brightgreen)](#test-suite)
+[![Test Suites](https://img.shields.io/badge/Tests-5%20suites%20%7C%20142%20assertions-brightgreen)](#test-suite)
 [![Evals](https://img.shields.io/badge/Evals-23%20CSV%20scenarios-brightgreen)](evals/)
 [![Terraform](https://img.shields.io/badge/Terraform-1.5%2B-7B42BC?logo=terraform&logoColor=white)](https://developer.hashicorp.com/terraform)
 
@@ -20,7 +20,7 @@ This project provides a **production-grade SQL framework** to stand up a T&E man
 - **Test execution** — events, results, verdicts, and evidence artefacts
 - **Defect reporting** — deficiency reports (DRs) linked directly to failed results
 - **Multi-environment isolation** — separate databases, schemas, and users for Dev, Test, Staging, and Prod
-- **Automated data testing** — 85 assertions across 5 SQL test suites, all written in pure PostgreSQL
+- **Automated data testing** — 142 assertions across 5 SQL test suites, all written in pure PostgreSQL
 - **Data-driven evals** — 23 offline CSV validator scenarios plus PostgreSQL-backed idempotency and full-suite checks
 
 All names (database, schema, users, every table) are controlled by a single `\set` configuration block at the top of each environment file. Rename anything in one place and the entire script updates automatically.
@@ -518,7 +518,7 @@ The `evals/` package complements the SQL and unit tests with scenario fixtures a
 |---|---|---|
 | P | `csv/validator.py` across 23 CSV edge cases, including malformed rows, BOM, CRLF, Unicode, quoted newlines, long fields, missing env vars, and invalid UTF-8 bytes | No |
 | I | Dev deployment idempotency by deploying twice and comparing seed row counts | Yes |
-| S | Fresh Dev deploy followed by the full SQL suite, expecting all 85 assertions to pass | Yes |
+| S | Fresh Dev deploy followed by the full SQL suite, expecting all 142 assertions to pass | Yes |
 
 Run examples:
 
@@ -530,7 +530,7 @@ python evals\runner.py --only 14_quoted_newline --tiers p
 
 Each eval run writes a JSON report under `evals/reports/<run_id>/summary.json`; that folder is intentionally gitignored.
 
-### Coverage — 85 assertions across 5 suites
+### Coverage — 142 assertions across 5 suites
 
 | Suite | Assertions | What is tested |
 |---|---|---|
@@ -704,7 +704,7 @@ Contributions are welcome. Please follow these steps:
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/your-feature-name`
 3. Make your changes and add or update tests in `tests/suites/`
-4. Verify all 85 assertions still pass: `./tests/run_tests.sh dev`
+4. Verify all 142 assertions still pass: `./tests/run_tests.sh dev`
 5. Open a Pull Request with a clear description of what changed and why
 
 **Guidelines:**
