@@ -1,54 +1,46 @@
-*.secret
-*.env
-.env*
+﻿# Secrets & environment-specific config (NEVER commit)
 config.local.env
-local_*.sql
-*_local.sql
-*_secrets.sql
-environments/*_local.sql
-environments/*_override.sql
-*.dump
-*.sql.gz
-*.backup
-*.bak
-pg_dump_*
-/tmp/
-test_output/
-*.out
-*.log
-csv/logs/
+*.local.env
+build/environments/env_dev.sql
+build/environments/env_test.sql
+build/environments/env_staging.sql
+build/environments/env_prod.sql
+!build/environments/*.example.sql
+*.tfvars
+!*.tfvars.example
+*.pgpass
+.env
+.env.*
+!.env.example
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+
+# Eval / test runtime output
 evals/reports/
-*_report_*.txt
-*_skipped_*.csv
-*_valid_*.csv
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+**/csv/logs/
+
+# Tool / session / editor folders
+.abacusai/
+.claude/
+.cursor/
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-*.orig
+
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
+.pytest_cache/
 .venv/
 venv/
-node_modules/
-npm-debug.log*
-terraform-github-repos/.terraform/
-terraform-github-repos/*.tfstate
-terraform-github-repos/*.tfstate.*
-terraform-github-repos/crash.log
-.abacusai/
 
-# Terraform plan artifacts (binary, environment-specific, never commit)
-*.tfplan
-tfplan
-.terraform.lock.hcl
+# OS
+.DS_Store
+Thumbs.db
+
+# Exploratory / not-yet-wired folders
+_norton_/
+extend to Oracle dbs/

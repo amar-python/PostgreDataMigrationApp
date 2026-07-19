@@ -29,48 +29,44 @@
 -- PHASE 1: DATABASE & USER
 -- =============================================================================
 
-\echo '>> [1/6] Creating database:' :db_name
+-- Store psql variables as session parameters so DO blocks can access them.
+-- (psql does not substitute :varname inside $$ dollar-quoted strings.)
+SELECT
+   set_config('te.env_label',    :'env_label',    false),
+   set_config('te.db_name',      :'db_name',      false),
+   set_config('te.app_user',     :'app_user',     false),
+   set_config('te.app_password', :'app_password', false),
+   set_config('te.conn_limit',   :'conn_limit',   false);
 
-DO
-$$
-BEGIN
-   IF NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db_name') THEN
-      PERFORM dblink_exec(
-         'dbname=' || current_database(),
-         'CREATE DATABASE "' || :'db_name' || '"
-            WITH OWNER = "' || :'db_owner' || '"
-            ENCODING   = ''UTF8''
-            TEMPLATE   = template0
-            CONNECTION LIMIT = -1'
-      );
-      RAISE NOTICE '[%] Database "%" created.', :'env_label', :'db_name';
-   ELSE
-      RAISE NOTICE '[%] Database "%" already exists — skipping.', :'env_label', :'db_name';
-   END IF;
-END
-$$;
+\echo '>> [1/6] Creating database:' :db_name
+-- Database creation is handled by deploy_all.sh before this script runs.
 
 \echo '>> [2/6] Creating application user:' :app_user
 
 DO
 $$
+DECLARE
+   v_app_user     TEXT := current_setting('te.app_user');
+   v_app_password TEXT := current_setting('te.app_password');
+   v_conn_limit   INT  := current_setting('te.conn_limit')::INT;
+   v_env          TEXT := current_setting('te.env_label');
 BEGIN
-   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'app_user') THEN
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = v_app_user) THEN
       EXECUTE format(
          'CREATE ROLE %I WITH LOGIN PASSWORD %L
           NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT %s',
-         :'app_user', :'app_password', :'conn_limit'
+         v_app_user, v_app_password, v_conn_limit
       );
-      RAISE NOTICE '[%] Role "%" created.', :'env_label', :'app_user';
+      RAISE NOTICE '[%] Role "%" created.', v_env, v_app_user;
    ELSE
-      -- Refresh password on every run (safe for non-prod)
-      EXECUTE format('ALTER ROLE %I PASSWORD %L', :'app_user', :'app_password');
-      RAISE NOTICE '[%] Role "%" already exists — password refreshed.', :'env_label', :'app_user';
+      EXECUTE format('ALTER ROLE %I PASSWORD %L CONNECTION LIMIT %s',
+                     v_app_user, v_app_password, v_conn_limit);
+      RAISE NOTICE '[%] Role "%" already exists — password and conn_limit refreshed.', v_env, v_app_user;
    END IF;
 END
 $$;
 
-EXECUTE format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I', :'db_name', :'app_user');
+GRANT ALL PRIVILEGES ON DATABASE :"db_name" TO :"app_user";
 
 
 -- =============================================================================
@@ -78,6 +74,24 @@ EXECUTE format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I', :'db_name', :'app_us
 -- =============================================================================
 
 \c :"db_name"
+
+-- Re-establish session parameters after \c opens a new connection.
+SELECT
+   set_config('te.env_label',           :'env_label',           false),
+   set_config('te.schema_name',         :'schema_name',         false),
+   set_config('te.app_user',            :'app_user',            false),
+   set_config('te.tbl_organisations',   :'tbl_organisations',   false),
+   set_config('te.tbl_personnel',       :'tbl_personnel',       false),
+   set_config('te.tbl_test_programs',   :'tbl_test_programs',   false),
+   set_config('te.tbl_temp_documents',  :'tbl_temp_documents',  false),
+   set_config('te.tbl_test_phases',     :'tbl_test_phases',     false),
+   set_config('te.tbl_requirements',    :'tbl_requirements',    false),
+   set_config('te.tbl_test_cases',      :'tbl_test_cases',      false),
+   set_config('te.tbl_vcrm_entries',    :'tbl_vcrm_entries',    false),
+   set_config('te.tbl_test_events',     :'tbl_test_events',     false),
+   set_config('te.tbl_test_results',    :'tbl_test_results',    false),
+   set_config('te.tbl_defect_reports',  :'tbl_defect_reports',  false),
+   set_config('te.tbl_evidence_artifacts', :'tbl_evidence_artifacts', false);
 
 \echo '>> [3/6] Setting up schema:' :schema_name
 
@@ -88,12 +102,9 @@ CREATE EXTENSION IF NOT EXISTS "dblink";
 CREATE SCHEMA IF NOT EXISTS :"schema_name";
 SELECT set_config('search_path', :'schema_name' || ',public', false);
 
-EXECUTE format('GRANT USAGE ON SCHEMA %I TO %I', :'schema_name', :'app_user');
-EXECUTE format('GRANT ALL   ON ALL TABLES IN SCHEMA %I TO %I', :'schema_name', :'app_user');
-EXECUTE format(
-   'ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT ALL ON TABLES TO %I',
-   :'schema_name', :'app_user'
-);
+GRANT USAGE ON SCHEMA :"schema_name" TO :"app_user";
+GRANT ALL ON ALL TABLES IN SCHEMA :"schema_name" TO :"app_user";
+ALTER DEFAULT PRIVILEGES IN SCHEMA :"schema_name" GRANT ALL ON TABLES TO :"app_user";
 
 
 -- =============================================================================
@@ -449,12 +460,17 @@ $$;
 DO
 $$
 DECLARE
-   tbl TEXT;
+   tbl    TEXT;
+   v_sch  TEXT := current_setting('te.schema_name');
 BEGIN
    FOREACH tbl IN ARRAY ARRAY[
-      :'tbl_organisations', :'tbl_personnel', :'tbl_test_programs',
-      :'tbl_temp_documents', :'tbl_test_cases',
-      :'tbl_test_events',   :'tbl_defect_reports'
+      current_setting('te.tbl_organisations'),
+      current_setting('te.tbl_personnel'),
+      current_setting('te.tbl_test_programs'),
+      current_setting('te.tbl_temp_documents'),
+      current_setting('te.tbl_test_cases'),
+      current_setting('te.tbl_test_events'),
+      current_setting('te.tbl_defect_reports')
    ]
    LOOP
       EXECUTE format(
@@ -462,9 +478,9 @@ BEGIN
           CREATE TRIGGER trg_updated_at
             BEFORE UPDATE ON %I.%I
             FOR EACH ROW EXECUTE FUNCTION %I.set_updated_at();',
-         :'schema_name', tbl,
-         :'schema_name', tbl,
-         :'schema_name'
+         v_sch, tbl,
+         v_sch, tbl,
+         v_sch
       );
    END LOOP;
 END;
@@ -476,7 +492,7 @@ $$;
 -- Inserted for dev and test environments; skipped for staging and prod.
 -- =============================================================================
 
-\if :'include_seed_data' = 'true'
+\if :include_seed_data
 
 \echo '>> [5/6] Seeding realistic T&E data'
 

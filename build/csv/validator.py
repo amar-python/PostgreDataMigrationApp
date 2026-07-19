@@ -1,137 +1,82 @@
-#!/usr/bin/env python3
-# =============================================================================
-# csv/validator.py — CSV Validator (Windows / Mac / Linux compatible)
-# =============================================================================
-# Called by csv_loader.sh via: python3 csv/validator.py
-#
-# Reads environment variables:
-#   CSV_FILE   — path to the source CSV file
-#   VALID_CSV  — path to write accepted rows
-#   SKIP_FILE  — path to write rejected rows with reasons
-#   TABLE_NAME — target table name (used for logging only)
-#
-# Exit codes:
-#   0 — validation passed (at least one valid row found)
-#   1 — validation failed (no valid rows or file error)
-# =============================================================================
+﻿#!/usr/bin/env python3
+# csv/validator.py — handles invalid UTF-8 per-row + delimiter auto-detect
+import csv, os, sys
 
-import csv
-import os
-import sys
+GREEN, YELLOW, RED, NC = '\033[0;32m', '\033[1;33m', '\033[0;31m', '\033[0m'
+def log(m):  print(f"{GREEN}  [validator OK]{NC} {m}")
+def warn(m): print(f"{YELLOW}  [validator WARN]{NC} {m}")
+def err(m):  print(f"{RED}  [validator ERR]{NC} {m}", file=sys.stderr)
 
-# ── Colours (work on Windows 10+ terminal and Git Bash) ──────────────────────
-GREEN  = '\033[0;32m'
-YELLOW = '\033[1;33m'
-RED    = '\033[0;31m'
-NC     = '\033[0m'
+def has_bad_bytes(cell):
+    try:
+        cell.encode("utf-8"); return False
+    except UnicodeEncodeError:
+        return True
+def clean(cell):
+    return cell.encode("utf-8", "replace").decode("utf-8")
 
+CSV_FILE  = os.environ.get("CSV_FILE", "")
+VALID_CSV = os.environ.get("VALID_CSV", "")
+SKIP_FILE = os.environ.get("SKIP_FILE", "")
+FORCE_DELIM = os.environ.get("CSV_DELIMITER", "")
 
-def log(msg):  print(f"{GREEN}  [validator OK]{NC} {msg}")
-
-
-def warn(msg): print(f"{YELLOW}  [validator WARN]{NC} {msg}")
-
-
-def err(msg):  print(f"{RED}  [validator ERR]{NC} {msg}", file=sys.stderr)
-
-
-# ── Read environment variables ────────────────────────────────────────────────
-CSV_FILE   = os.environ.get('CSV_FILE',   '')
-VALID_CSV  = os.environ.get('VALID_CSV',  '')
-SKIP_FILE  = os.environ.get('SKIP_FILE',  '')
-TABLE_NAME = os.environ.get('TABLE_NAME', 'unknown')
-
-# Validate required vars
-missing = [v for v in ('CSV_FILE', 'VALID_CSV', 'SKIP_FILE') if not os.environ.get(v)]
+missing = [v for v in ("CSV_FILE","VALID_CSV","SKIP_FILE") if not os.environ.get(v)]
 if missing:
-    err(f"Missing required environment variables: {', '.join(missing)}")
-    sys.exit(1)
-
-# ── Check source file exists ──────────────────────────────────────────────────
+    err(f"Missing required environment variables: {', '.join(missing)}"); sys.exit(1)
 if not os.path.isfile(CSV_FILE):
-    err(f"CSV file not found: {CSV_FILE}")
-    sys.exit(1)
+    err(f"CSV file not found: {CSV_FILE}"); sys.exit(1)
+os.makedirs(os.path.dirname(VALID_CSV) or ".", exist_ok=True)
+os.makedirs(os.path.dirname(SKIP_FILE) or ".", exist_ok=True)
 
-# ── Ensure output directories exist ──────────────────────────────────────────
-os.makedirs(os.path.dirname(VALID_CSV), exist_ok=True)
-os.makedirs(os.path.dirname(SKIP_FILE), exist_ok=True)
+def detect_delimiter(path):
+    if FORCE_DELIM:
+        return FORCE_DELIM.encode().decode("unicode_escape")
+    try:
+        with open(path, "r", encoding="utf-8-sig", errors="surrogateescape", newline="") as fh:
+            sample = fh.read(8192)
+        if not sample: return ","
+        return csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+    except Exception:
+        return ","
 
-# ── Open and validate CSV ─────────────────────────────────────────────────────
+DELIM = detect_delimiter(CSV_FILE)
+label = {",":"comma",";":"semicolon","\t":"tab","|":"pipe"}.get(DELIM, repr(DELIM))
+
 try:
-    with open(CSV_FILE, 'r', encoding='utf-8-sig', newline='') as src, \
-         open(VALID_CSV, 'w', encoding='utf-8',    newline='') as vf,  \
-         open(SKIP_FILE, 'w', encoding='utf-8',    newline='') as sf:
-
-        reader   = csv.reader(src)
-        writer_v = csv.writer(vf)
-        writer_s = csv.writer(sf)
-
-        # ── Read and validate header ──────────────────────────────────────────
+    with open(CSV_FILE, "r", encoding="utf-8-sig", errors="surrogateescape", newline="") as src, \
+         open(VALID_CSV, "w", encoding="utf-8", newline="") as vf, \
+         open(SKIP_FILE, "w", encoding="utf-8", newline="") as sf:
+        reader, wv, ws = csv.reader(src, delimiter=DELIM), csv.writer(vf, delimiter=DELIM), csv.writer(sf, delimiter=DELIM)
         try:
             headers = next(reader)
         except StopIteration:
-            err("CSV file is empty — no header row found.")
-            sys.exit(1)
-
-        # Strip whitespace from header names
-        headers = [h.strip() for h in headers]
-        ncols   = len(headers)
-
+            err("CSV file is empty — no header row found."); sys.exit(1)
+        headers = [h.strip() for h in headers]; ncols = len(headers)
         if ncols == 0:
-            err("Header row is empty.")
-            sys.exit(1)
-
-        log(f"Header: {ncols} columns detected — {' | '.join(headers)}")
-
-        # Check for duplicate column names
-        dupes = [h for h in set(headers) if headers.count(h) > 1]
-        if dupes:
-            warn(f"Duplicate column names: {', '.join(dupes)}")
-
-        # Write headers to both output files
-        writer_v.writerow(headers)
-        writer_s.writerow(headers + ['_skip_reason'])
-
-        # ── Process each data row ─────────────────────────────────────────────
-        valid_count = 0
-        skip_count  = 0
-
-        for line_num, row in enumerate(reader, start=2):
-
-            # Rule 1: skip completely empty rows
-            if not any(cell.strip() for cell in row):
-                writer_s.writerow(row + ['empty row — all values blank'])
-                skip_count += 1
-                continue
-
-            # Rule 2: column count must match header
+            err("Header row is empty."); sys.exit(1)
+        if any(has_bad_bytes(h) for h in headers):
+            err("Header row contains invalid UTF-8 bytes — cannot process file."); sys.exit(1)
+        log(f"Delimiter: {label}")
+        log(f"Header: {ncols} columns — {' | '.join(headers)}")
+        dupes = sorted({h for h in headers if headers.count(h) > 1})
+        if dupes: warn(f"Duplicate column names: {', '.join(dupes)}")
+        wv.writerow(headers); ws.writerow(headers + ["_skip_reason"])
+        valid = skip = 0
+        for n, row in enumerate(reader, start=2):
+            if not any(c.strip() for c in row):
+                ws.writerow([clean(c) for c in row] + ["empty row — all values blank"]); skip += 1; continue
+            if any(has_bad_bytes(c) for c in row):
+                ws.writerow([clean(c) for c in row] + [f"invalid UTF-8 bytes at line {n}"]); skip += 1; continue
             if len(row) != ncols:
-                reason = f'column mismatch — expected {ncols}, got {len(row)}'
-                writer_s.writerow(row + [reason])
-                skip_count += 1
-                continue
-
-            # Valid row
-            writer_v.writerow(row)
-            valid_count += 1
-
-        # ── Summary ───────────────────────────────────────────────────────────
-        total = valid_count + skip_count
-        log(f"Validation complete — {total} rows processed.")
-        log(f"  Valid rows   : {valid_count}")
-
-        if skip_count > 0:
-            warn(f"  Skipped rows : {skip_count} — written to: {SKIP_FILE}")
-
-        if valid_count == 0:
-            err("No valid rows found. Nothing to load.")
-            sys.exit(1)
-
+                ws.writerow([clean(c) for c in row] + [f"column mismatch — expected {ncols}, got {len(row)}"]); skip += 1; continue
+            wv.writerow(row); valid += 1
+        log(f"Validation complete — {valid + skip} rows processed.")
+        log(f"  Valid rows   : {valid}")
+        if skip: warn(f"  Skipped rows : {skip} — written to: {SKIP_FILE}")
+        if valid == 0:
+            err("No valid rows found. Nothing to load."); sys.exit(1)
         sys.exit(0)
-
 except PermissionError as e:
-    err(f"Permission denied: {e}")
-    sys.exit(1)
+    err(f"Permission denied: {e}"); sys.exit(1)
 except Exception as e:
-    err(f"Unexpected error: {e}")
-    sys.exit(1)
+    err(f"Unexpected error: {e}"); sys.exit(1)
