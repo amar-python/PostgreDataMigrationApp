@@ -55,14 +55,16 @@ class EvalsRunnerTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn("Unknown runner_action", result.errors[0])
 
-    def test_tier_p_generated_invalid_utf8_fails_cleanly(self):
-        """The 23_invalid_utf8_bytes eval scenario should produce exit_code=1 with 'Unexpected error' in stderr and no raw Traceback."""
+    def test_tier_p_generated_invalid_utf8_skips_row_cleanly(self):
+        """The 23_invalid_utf8_bytes eval scenario: an invalid-UTF-8 data row is
+        skipped with a reason while valid rows still pass (exit_code=0), per the
+        loader's load-what-is-valid contract. No raw Traceback may appear."""
         scenario = PROJECT_ROOT / "evals" / "datasets" / "tier_p" / "23_invalid_utf8_bytes"
         result = runner.run_tier_p_scenario(scenario)
 
         self.assertTrue(result.passed, result.errors)
-        self.assertEqual(result.actual["exit_code"], 1)
-        self.assertIn("Unexpected error", result.actual["stderr"])
+        self.assertEqual(result.actual["exit_code"], 0)
+        self.assertEqual(result.actual["skip_csv_row_count"], 1)
         self.assertNotIn("Traceback", result.actual["stderr"])
 
     def test_tier_i_skips_when_postgresql_is_unavailable(self):

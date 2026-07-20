@@ -153,12 +153,19 @@ class TestSqlFilesNoInlineCredentials(unittest.TestCase):
     _SQL_PASSWORD = re.compile(
         r"(?i)(PASSWORD\s+['\"][^'\"]{3,}['\"])",
     )
+    # Obvious placeholder values are allowed in committed template files
+    # (e.g. env_dev.example.sql). Real secrets never match these shapes.
+    _PLACEHOLDER = re.compile(
+        r"(?i)['\"](__[A-Z0-9_]+__|CHANGE_?ME\w*|YOUR_[A-Z0-9_]+|PLACEHOLDER\w*)['\"]",
+    )
 
     def test_env_sql_files_no_hardcoded_passwords(self):
         env_dir = ROOT / "build" / "environments"
         for sql_file in env_dir.glob("env_*.sql"):
             text = sql_file.read_text(encoding="utf-8", errors="replace")
             for i, line in enumerate(text.splitlines(), 1):
+                if self._PLACEHOLDER.search(line):
+                    continue
                 if self._SQL_PASSWORD.search(line) and not line.strip().startswith("--"):
                     self.fail(
                         f"Possible hardcoded password in SQL file "

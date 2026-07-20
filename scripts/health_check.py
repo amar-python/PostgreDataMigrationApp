@@ -90,10 +90,15 @@ def check_sql_files() -> None:
     pg_schema = ROOT / "build" / "schema" / "postgresql" / "te_core_schema.sql"
     _check_file("postgresql schema", pg_schema)
 
-    envs = ["dev", "test", "staging", "prod"]
-    for env in envs:
+    # Concrete env_<env>.sql files are gitignored (they carry credentials);
+    # only the committed template must exist. Concrete files are reported
+    # informationally when present so local setups still get visibility.
+    template = ROOT / "build" / "environments" / "env_dev.example.sql"
+    _check_file("env template (env_dev.example.sql)", template)
+    for env in ["dev", "test", "staging", "prod"]:
         path = ROOT / "build" / "environments" / f"env_{env}.sql"
-        _check_file(f"env_{env}.sql", path)
+        if path.exists():
+            _pass(f"env_{env}.sql (local, gitignored)")
 
     suite_dir = ROOT / "tests" / "suites"
     suites = sorted(suite_dir.glob("test_*.sql")) if suite_dir.exists() else []

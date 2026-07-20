@@ -13,15 +13,15 @@ import json
 import sys
 from pathlib import Path
 
-ROOT        = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[1]
 REPORTS_DIR = ROOT / "evals" / "reports"
 
-GREEN  = "\033[0;32m"
-RED    = "\033[0;31m"
+GREEN = "\033[0;32m"
+RED = "\033[0;31m"
 YELLOW = "\033[1;33m"
-CYAN   = "\033[0;36m"
-DIM    = "\033[2m"
-NC     = "\033[0m"
+CYAN = "\033[0;36m"
+DIM = "\033[2m"
+NC = "\033[0m"
 
 
 def _load(run_id: str) -> dict:
@@ -50,7 +50,10 @@ def main() -> None:
     elif len(runs) >= 2:
         id_a, id_b = runs[-2].name, runs[-1].name
     else:
-        print(f"{YELLOW}Need at least 2 eval runs. Pass run IDs as arguments or run evals first.{NC}")
+        print(
+            f"{YELLOW}Need at least 2 eval runs. "
+            f"Pass run IDs as arguments or run evals first.{NC}"
+        )
         sys.exit(0)
 
     a = _load(id_a)
@@ -103,8 +106,14 @@ def main() -> None:
     print()
     ta = a.get("totals", {})
     tb = b.get("totals", {})
-    print(f"  Totals   A: {ta.get('passed',0)}P/{ta.get('failed',0)}F/{ta.get('skipped',0)}S")
-    print(f"           B: {tb.get('passed',0)}P/{tb.get('failed',0)}F/{tb.get('skipped',0)}S")
+    print(
+        f"  Totals   A: {ta.get('passed', 0)}P/"
+        f"{ta.get('failed', 0)}F/{ta.get('skipped', 0)}S"
+    )
+    print(
+        f"           B: {tb.get('passed', 0)}P/"
+        f"{tb.get('failed', 0)}F/{tb.get('skipped', 0)}S"
+    )
     print()
     if regressions:
         print(f"  {RED}{regressions} regression(s) detected{NC}")
