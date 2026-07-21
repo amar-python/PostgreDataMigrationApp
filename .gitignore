@@ -50,3 +50,5 @@ tests/snapshots/
 tfplan
 *.tfplan
 terraform-provider-*.log
+
+*.zip
