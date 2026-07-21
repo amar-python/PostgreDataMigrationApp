@@ -587,6 +587,102 @@ REPORT 4: Overall Result
 
 ---
 
+## Running the Full Test Suite
+
+Every test reports **pass** or **fail**. Nothing is skipped: an unavailable
+prerequisite (no PostgreSQL, no `env_<env>.sql`, no `config.local.env`, no
+deployed database, no bash) is a **failure**, not a silent skip.
+
+### One-time provisioning
+
+Concrete environment launchers and `config.local.env` are gitignored, so a
+fresh clone has none of them. Create them all in one step:
+
+```bash
+bash scripts/provision_full_test_env.sh
+```
+
+This copies `env_<env>.sql` from the committed `*.example.sql` templates, writes
+a local `config.local.env`, and deploys all four environments. It needs a
+reachable PostgreSQL and `PGUSER` / `PGHOST` / `PGPORT` set.
+
+### Run with full accounting
+
+```bash
+python3 scripts/test_report.py --strict
+```
+
+Every run ends with a block accounting for all collected tests:
+
+```text
+==================================================================
+  FINAL RESULT — every test accounted for
+==================================================================
+  collected     : 54
+  executed      : 54
+  PASSED        : 54
+  FAILED        : 0
+  ERROR         : 0
+  SKIPPED       : 0
+  NOT RUN       : 0  (deselected by the marker filter)
+
+  SKIPPED (0)
+    none — no test was skipped
+==================================================================
+  RESULT: PASS
+==================================================================
+```
+
+The **SKIPPED** section prints even when empty, so its absence is never
+ambiguous. **NOT RUN** names each test deselected by a marker filter — those are
+out of that invocation's scope, not skipped, and must run in another job.
+`--strict` exits non-zero if anything was skipped.
+
+```bash
+python3 scripts/test_report.py                                  # whole suite
+python3 scripts/test_report.py --markers "unit or security"     # scoped
+```
+
+### Expected results
+
+| Layer | Command | Expected |
+|---|---|---|
+| Python tests | `python3 scripts/test_report.py --strict` | 54 / 54, 0 skipped |
+| SQL assertions | `bash tests/run_tests.sh dev` | 142 / 142, 100% |
+| Evals P, I, S | `python3 evals/runner.py --tiers p,i,s` | 25 / 25, 0 skipped |
+| Lint | `bash scripts/lint.sh` | flake8 + bandit clean |
+| Health | `python3 scripts/health_check.py` | all checks pass |
+
+Captured output for each of these is in `test-artifacts/` — including a
+deliberate negative-control run proving that missing prerequisites fail rather
+than skip. See `test-artifacts/00_SUMMARY.md`.
+
+### CI
+
+| Workflow | Runner | Scope |
+|---|---|---|
+| `quality-gate.yml` — `free-tier` | ubuntu | `unit`, `regression`, `security`, `snapshot` |
+| `quality-gate.yml` — `integration-postgres` | ubuntu + PG service | full suite, all four environments |
+| `python-validator-tests.yml` | windows | database-free markers |
+
+Both workflows end with `scripts/test_report.py --strict`, so a skipped test
+fails the build. GitHub Actions service containers are Linux-only, so the
+Windows job cannot host PostgreSQL; it runs the database-free markers and prints
+the tests it does not run by name. The database-backed markers run in
+`integration-postgres`.
+
+### Related documents
+
+| Document | Contents |
+|---|---|
+| `FIXES_APPLIED.md` | Every fix made during the audit, with evidence |
+| `GAP_ANALYSIS.md` | Open gaps and the decisions they need |
+| `VCRM_GAPS.md` | Business-requirement traceability, regenerated per run |
+| `TEST_CONDITIONS.md` | Full catalogue of test conditions |
+| `test-artifacts/00_SUMMARY.md` | Captured output from the verification run |
+
+---
+
 ## Idempotency
 
 The entire framework is safe to re-run against an existing database:

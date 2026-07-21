@@ -196,7 +196,7 @@ Replace the timestamp with any folder name under `evals\reports\`.
 | --- | --- | --- | --- |
 | P | 23 | All exit-code + stderr diffs match expected | ~5 s |
 | I | 1 | Two deploys back-to-back, identical row counts | ~10 s |
-| S | 1 | 85/85 assertions, "ALL TESTS PASSED" in stdout | ~30 s |
+| S | 1 | 142/142 assertions, "ALL TESTS PASSED" in stdout | ~30 s |
 | X | deferred | Cross-engine schema equivalence | n/a |
 | E | deferred | Cross-environment structural parity | n/a |
 

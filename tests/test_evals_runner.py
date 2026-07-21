@@ -67,14 +67,14 @@ class EvalsRunnerTests(unittest.TestCase):
         self.assertEqual(result.actual["skip_csv_row_count"], 1)
         self.assertNotIn("Traceback", result.actual["stderr"])
 
-    def test_tier_i_skips_when_postgresql_is_unavailable(self):
-        """When _can_connect_pg returns False, run_tier_i_scenario should mark the result as skipped with 'PostgreSQL not reachable'."""
+    def test_tier_i_fails_when_postgresql_is_unavailable(self):
+        """When _can_connect_pg returns False, run_tier_i_scenario must FAIL (not skip): an unavailable prerequisite is a failure, so a green run always means the scenario really executed."""
         scenario = PROJECT_ROOT / "evals" / "datasets" / "tier_i" / "01_deploy_dev_twice"
 
         with mock.patch.object(runner, "_can_connect_pg", return_value=False):
             result = runner.run_tier_i_scenario(scenario)
 
-        self.assertTrue(result.skipped)
+        self.assertFalse(result.skipped)
         self.assertFalse(result.passed)
         self.assertIn("PostgreSQL not reachable", result.errors[0])
 

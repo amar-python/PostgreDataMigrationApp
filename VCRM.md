@@ -61,7 +61,7 @@ Test-layer codes used in column headers below:
 | **BR-17** | The framework shall **gracefully degrade** when an optional dependency (PostgreSQL, psql, Internet) is unavailable: tests skip cleanly rather than crashing. | `evals/runner.py` design intent |
 | **BR-18** | Every regression run shall produce a **machine-readable JSON report** persisted under `evals/reports/<run_id>/`. | `evals/runner.py` behaviour |
 | **BR-19** | The build, test, and eval layers shall be **physically segregated** so a change to one cannot inadvertently break the others' contract. | `ARCHITECTURE.md` |
-| **BR-20** | The full SQL test suite shall reach **85 of 85 assertions passing** (100.0 % pass rate) on every release. | README §"85 assertions", `tests/run_all_tests.sql` |
+| **BR-20** | The full SQL test suite shall reach **142 of 142 assertions passing** (100.0 % pass rate) on every release. | README §"142 assertions", `tests/run_all_tests.sql` |
 
 ### Out of scope (recorded for completeness)
 

@@ -2,7 +2,7 @@
 
 The validation half (Tier P) runs offline with no database.
 The load + verify half (Tier I/S) requires a live PostgreSQL instance
-and is skipped automatically when one is not reachable.
+and FAILS (never skips) when one is not reachable.
 
 Mirrors gstack's skill-e2e-*.test.ts pattern: tests exercise the full
 user-facing workflow, not just individual functions.
@@ -39,6 +39,20 @@ def _can_connect_pg() -> bool:
 
 
 _PG_AVAILABLE = _can_connect_pg()
+
+# The concrete env launchers are gitignored (only env_dev.example.sql is
+# committed), so a fresh clone has no env_dev.sql. Tier I/S deploys require it,
+# so treat its absence the same way we treat an unreachable database: skip.
+_ENV_DEV_SQL   = ROOT / "build" / "environments" / "env_dev.sql"
+_DB_E2E_READY  = _PG_AVAILABLE and _ENV_DEV_SQL.exists()
+HELP           = ("Run 'bash scripts/provision_full_test_env.sh' (needs a reachable "
+                  "PostgreSQL and PGUSER/PGHOST/PGPORT set).")
+_SKIP_REASON   = (
+    "PostgreSQL not reachable — skipping DB-dependent E2E tests"
+    if not _PG_AVAILABLE
+    else "build/environments/env_dev.sql not present (create it from "
+         "env_dev.example.sql) — skipping DB-dependent E2E tests"
+)
 
 
 class E2EPipelineValidateOnly(unittest.TestCase):
@@ -145,8 +159,14 @@ class E2EPipelineValidateOnly(unittest.TestCase):
                 self.assertNotIn("Traceback", r.stderr)
 
 
-@unittest.skipUnless(_PG_AVAILABLE, "PostgreSQL not reachable — skipping DB-dependent E2E tests")
 class E2EPipelineWithDatabase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Unavailable prerequisites are a FAILURE, not a skip: a green run must
+        # mean these tests actually executed.
+        if not _DB_E2E_READY:
+            raise AssertionError(f"{_SKIP_REASON}. {HELP}")
+
     """Full CSV → validate → DB load → verify pipeline. Requires PostgreSQL."""
 
     def test_tier_p_scenarios_all_pass(self):

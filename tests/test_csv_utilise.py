@@ -51,8 +51,13 @@ def run(args, env=None):
     )
 
 
-@unittest.skipIf(_BASH is None, "No working bash found (Git Bash recommended on Windows)")
 class CsvUtiliseArgumentParsing(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if _BASH is None:
+            raise AssertionError(
+                "No working bash found — install Git Bash and ensure it is on PATH.")
+
     def test_no_args_shows_usage_and_exits_nonzero(self):
         """No args → exit 1 with usage banner on stdout."""
         r = run([])

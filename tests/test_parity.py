@@ -95,12 +95,44 @@ def _table_exists(db: str, schema: str, table: str) -> bool:
     return r.returncode == 0 and r.stdout.strip() == "1"
 
 
+def _db_deployed(db: str) -> bool:
+    """True only if the environment database actually exists on the server."""
+    if not _can_connect():
+        return False
+    try:
+        r = subprocess.run(
+            ["psql", "-tA", "-c",
+             f"SELECT 1 FROM pg_database WHERE datname = '{db}'"],
+            env=_pg_env(), capture_output=True, text=True, timeout=5,
+        )
+        return r.returncode == 0 and r.stdout.strip() == "1"
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
 _PG_AVAILABLE = _can_connect()
-_skip_no_pg = unittest.skipUnless(_PG_AVAILABLE, "PostgreSQL not reachable — skipping parity tests")
+# Reachable server is not enough — parity tests read seeded rows, so the
+# environment must also have been deployed (deploy_all.sh). A fresh clone has
+# a running server but no te_mgmt_* databases; skip rather than fail.
+_DEV_DEPLOYED = _db_deployed(_ENV_CONFIG["dev"][0])
+_HELP = ("Run 'bash scripts/provision_full_test_env.sh' (needs a reachable "
+         "PostgreSQL and PGUSER/PGHOST/PGPORT set).")
 
 
-@_skip_no_pg
+def _require_pg():
+    """Unavailable prerequisites FAIL — a green run must mean these ran."""
+    if not _PG_AVAILABLE:
+        raise AssertionError(f"PostgreSQL not reachable. {_HELP}")
+
+
+def _require_deployed():
+    _require_pg()
+    if not _DEV_DEPLOYED:
+        raise AssertionError(f"Dev database not deployed. {_HELP}")
+
+
 class TestDevSeedCounts(unittest.TestCase):
+    setUpClass = classmethod(lambda cls: _require_deployed())
     """Dev environment must contain at least the expected seed row counts."""
 
     def test_dev_seed_row_counts(self):
@@ -118,8 +150,8 @@ class TestDevSeedCounts(unittest.TestCase):
             self.fail("Dev seed row count failures:\n" + "\n".join(failures))
 
 
-@_skip_no_pg
 class TestAllEnvironmentsHaveRequiredTables(unittest.TestCase):
+    setUpClass = classmethod(lambda cls: _require_pg())
     """Every deployed environment must contain all required tables."""
 
     def _check_env(self, env_name: str) -> None:
@@ -130,7 +162,7 @@ class TestAllEnvironmentsHaveRequiredTables(unittest.TestCase):
             env=_pg_env(), capture_output=True, text=True, timeout=5,
         )
         if r.returncode != 0:
-            self.skipTest(f"Database {db!r} not deployed — skipping")
+            self.fail(f"Database {db!r} not deployed. {_HELP}")
 
         missing = [
             t for t in _REQUIRED_TABLES
@@ -155,8 +187,8 @@ class TestAllEnvironmentsHaveRequiredTables(unittest.TestCase):
         self._check_env("prod")
 
 
-@_skip_no_pg
 class TestIdempotentDeployParity(unittest.TestCase):
+    setUpClass = classmethod(lambda cls: _require_pg())
     """Row counts in dev must be identical after re-running the deploy script.
 
     This is the parity equivalent of gstack's parity-baseline-integrity test:
@@ -166,7 +198,7 @@ class TestIdempotentDeployParity(unittest.TestCase):
     def test_dev_row_counts_stable_after_second_deploy(self):
         env_sql = ROOT / "build" / "environments" / "env_dev.sql"
         if not env_sql.exists():
-            self.skipTest(f"env_dev.sql not found at {env_sql}")
+            self.fail(f"env_dev.sql not found at {env_sql}. {_HELP}")
 
         db, schema = _ENV_CONFIG["dev"]
 

@@ -333,7 +333,8 @@ def run_tier_i_scenario(scenario_dir: Path) -> ScenarioResult:
     result.expected = expected
 
     if not _can_connect_pg():
-        result.skipped = True
+        # An unavailable prerequisite is a FAILURE, not a skip: a green run
+        # must mean the scenario actually executed.
         result.errors.append(
             "PostgreSQL not reachable via psql "
             "(install psql + start PG, or set PG* env vars)."
@@ -424,7 +425,7 @@ def run_tier_s_scenario(scenario_dir: Path) -> ScenarioResult:
     result.expected = expected
 
     if not _can_connect_pg():
-        result.skipped = True
+        # Unavailable prerequisite = failure, not skip (see tier_i note above).
         result.errors.append(
             "PostgreSQL not reachable via psql — install/start PG and re-run."
         )

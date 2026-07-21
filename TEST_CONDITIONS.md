@@ -1,21 +1,20 @@
 # TEST_CONDITIONS — comprehensive catalog
 
-Every test condition that runs against the codebase, in one place. Six categories: Python unit tests, SQL test suites, Tier P / I / S evals, and the load-time verification queries shipped with `input_data/load_input_data.sql`.
+Every test condition that runs against the codebase, in one place. Five categories: Python unit tests, SQL test-suite assertions, and Tier P / I / S evals.
 
 ## At a glance
 
 | Category | Count | Where it lives | Driver |
 |----------|-------|---------------|--------|
-| Python unit tests | 11 | `tests/test_csv_validator.py`, `tests/test_evals_runner.py` | `unittest discover` |
-| SQL test-suite assertions | ~140 `assert_*` invocations totalling 85+ logical assertions | `tests/suites/test_0[1-5]_*.sql` | `tests/run_all_tests.sql` |
+| Python unit tests | 54 | `tests/test_*.py` (9 files) | `unittest discover` |
+| SQL test-suite assertions | 142 | `tests/suites/test_0[1-5]_*.sql` | `tests/run_all_tests.sql` |
 | Tier P eval scenarios | 23 | `evals/datasets/tier_p/` | `evals/runner.py` |
 | Tier I eval scenarios | 1 | `evals/datasets/tier_i/` | `evals/runner.py` |
 | Tier S eval scenarios | 1 | `evals/datasets/tier_s/` | `evals/runner.py` |
-| Load-time verification queries | 5 sections × ~3 queries each | `input_data/load_input_data.sql` | `input_data/load_input_data.ps1` |
 
 ---
 
-## 1. Python unit tests (11)
+## 1. Python unit tests (54)
 
 Located in `tests/`, run as `python -m unittest discover -s tests -p "test*.py"`. All currently green.
 
@@ -42,7 +41,7 @@ Located in `tests/`, run as `python -m unittest discover -s tests -p "test*.py"`
 
 ---
 
-## 2. SQL test-suite assertions (~140 invocations, 85+ logical)
+## 2. SQL test-suite assertions (142)
 
 Located in `tests/suites/`. Each suite is a standalone `.sql` file that uses the assertion library defined in `tests/framework/test_framework.sql`. Invoked via `tests/run_all_tests.sql` (orchestrator) or `tests/run_tests.sh` (Bash wrapper).
 
@@ -69,7 +68,7 @@ Located in `tests/suites/`. Each suite is a standalone `.sql` file that uses the
 | `test_04_execution_defects.sql` | 38 | `test_events`, `test_results`, `defect_reports` seed rows; verdict mix (pass/fail/blocked/inconclusive); DR → fail result linkage; `severity` enum (`critical`/`major`/`minor`/`observation`); `resolved_at` lifecycle (NULL while open, populated when closed) |
 | `test_05_schema_and_business_rules.sql` | 31 | Table existence; index existence; trigger firing; updated_at timestamp auto-update; cross-table business rules (e.g. `test_results.event_id` must reference an event in the same phase as the test case) |
 
-The README's headline number is **85 assertions** — that counts logical assertions; the grep count of 140 includes helper invocations and per-table iterations.
+The suite reports **142 assertions** at runtime (`142 | 142 | 0 | 0 | 100.0%`). A raw grep of `assert_*` call sites returns fewer, because some assertions run inside loops.
 
 **Pass criteria for Tier S:** suite output contains `ALL TESTS PASSED` and the total/pass-rate line shows 100%.
 
@@ -127,17 +126,13 @@ Located in `evals/datasets/tier_s/`. Requires reachable PostgreSQL; skips cleanl
 
 ---
 
-## 6. Load-time verification queries (5 sections)
+## 6. Load-time verification queries — REMOVED
 
-Located in `input_data/load_input_data.sql`. Runs after the data is loaded into `migration_test`. Output is human-readable, not exit-coded — failures look like unexpected counts or non-zero NULL audits.
-
-| Section | What it checks | What "healthy" looks like |
-|---------|---------------|--------------------------|
-| **1. Sample rows** | First 3 rows of `users`, `ndis_participants`, `test_csv_01` | Recognisable data appears |
-| **2. Aggregates** | users: row_count, distinct_countries, sum/avg lifetime_value, null_lifetime_value count; ndis_participants: count + sum_budget per state, plan_status mix; test_csv_01: row_count, distinct/min/max col_1 | Counts match CSV row counts; sums plausible |
-| **3. Staging → target reconciliation** | Side-by-side `staging_rows` vs `target_rows` vs `rows_dropped` for each of the three tables | users: 0 dropped. ndis: 0. test_csv_01: 10 dropped (the intentional duplicates) |
-| **4. Duplicate keys in staging** | PKs that appeared multiple times in source | Empty for users + ndis. For test_csv_01: col_1 = 1..10 each `occurrences = 2` |
-| **5. Required-column NULL audit** | NULL counts for NOT NULL columns on each target | All zeros |
+The `input_data/` directory (`load_input_data.sql`, `load_input_data.ps1`) is
+**not present in this repository**. CSV ingestion is now handled by
+`build/csv/validator.py` plus the per-engine loaders in `build/csv/`, driven by
+`build/csv_loader.sh`. Those paths are covered by the Tier P evals (category 3)
+and the Python unit tests (category 1).
 
 ---
 
@@ -205,9 +200,6 @@ python evals\runner.py --tiers p,i,s
 # SQL test suite directly (alternative to Tier S)
 psql -d migration_test --set schema_name=te_dev -f tests\run_all_tests.sql
 
-# Load-time verification block
-cd ..\input_data
-.\load_input_data.ps1
 ```
 
 ---

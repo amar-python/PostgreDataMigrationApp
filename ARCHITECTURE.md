@@ -33,7 +33,7 @@ The three layers can break independently, so we keep them physically separate. T
 | `build/csv/` | Python CSV validator (`validator.py`), per-engine shell loaders (`loader_*.sh`), and `samples/` |
 | `build/adapters/` | Per-engine deployment adapters (`adapter_postgresql.sh`, `adapter_mariadb.sh`, etc.) |
 | `build/schema/` | Engine-specific DDL and seed data |
-| `build/environments/` | PostgreSQL per-environment launchers (`env_dev.sql`, `env_test.sql`, etc.) |
+| `build/environments/` | PostgreSQL per-environment launchers. Only `env_dev.example.sql` is committed; concrete `env_<env>.sql` files are gitignored and created from it. |
 | `build/terraform-github-repos/` | GitHub repository management as Infrastructure-as-Code |
 | `build/setup.sh` | Interactive multi-database configuration wizard |
 | `build/deploy_all.sh` | Multi-engine deployment router |
@@ -67,7 +67,7 @@ The three layers can break independently, so we keep them physically separate. T
 | `evals/PLAN.md` | Scope, layout, phases, tier rationale |
 | `evals/USAGE.md` | End-to-end run instructions |
 | `evals/FAILURE_MODES.md` | Catalogue of 29 failure modes |
-| `evals/README.md` | Quick-start |
+| `evals/USAGE.md` | Quick-start |
 | `evals/HANDOFF.md` | What was delivered + next steps |
 | `evals/runner.py` | Scenario discovery + diff engine + JSON report writer |
 | `evals/datasets/tier_p/*` | 23 CSV scenarios for `build/csv/validator.py` |

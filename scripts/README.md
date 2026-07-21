@@ -7,10 +7,10 @@ local (PowerShell or Bash) or in GitHub Actions.
 
 | File | Purpose | Sibling CI workflow |
 | --- | --- | --- |
-| `build.ps1` | Windows: build the migration runner Docker image | `.github/workflows/build.yml` |
-| `build.sh` | Linux/Mac/Cloud Shell: same | `.github/workflows/build.yml` |
-| `test.ps1` | Windows: run pytest + SQL suite + evals | `.github/workflows/test.yml` |
-| `test.sh` | Linux/Mac/Cloud Shell: same | `.github/workflows/test.yml` |
+| `build.ps1` | Windows: build the migration runner Docker image | _(no CI workflow; run locally)_ |
+| `build.sh` | Linux/Mac/Cloud Shell: same | _(no CI workflow; run locally)_ |
+| `test.ps1` | Windows: run pytest + SQL suite + evals | `.github/workflows/quality-gate.yml` |
+| `test.sh` | Linux/Mac/Cloud Shell: same | `.github/workflows/quality-gate.yml` |
 
 ## Common recipes
 
@@ -55,8 +55,8 @@ Default: local `docker build`, tag `dev`, no push. Add `--acr-build` /
 
 | Workflow | When to use |
 | --- | --- |
-| **Build (image)** — `build.yml` | After code changes; produces a new image tag |
-| **Test (all layers)** — `test.yml` | After build; or any time to verify the deployed env still works |
+| **Quality Gate** — `quality-gate.yml` | Lint, health check, pytest, and Tier P evals on every push |
+| **Python Validator Tests** — `python-validator-tests.yml` | Windows unittest run for the CSV validator |
 
 Open <https://github.com/amar-python/PostgreDataMigrationApp/actions>,
 pick the workflow, click **Run workflow**, fill in inputs (defaults are
@@ -69,7 +69,7 @@ sensible), click the green button.
 | Pulled new code, no infra changes | `build` only |
 | Updated only test fixtures | `test` only |
 | Updated `build/csv/validator.py` or any source | `build` then `test` |
-| Updated `infra/terraform/*` | `azure-infra-deploy.yml` (separate workflow) |
+| Updated `infra/terraform/*` | Run Terraform locally — see `AZURE_DEPLOY.md` |
 | End-of-day sanity check | `test -OnlyPython` |
 | Before a release | `build` → `test` (full) → manual eyeball |
 
@@ -89,18 +89,15 @@ sensible), click the green button.
 | SQL test suite | 5 suites x ~87 assertions: schema, indexes, business rules | Yes |
 | Tier P evals | 23 CSV validator scenarios end-to-end | No |
 | Tier I evals | Idempotency: deploy twice, identical row counts | Yes |
-| Tier S evals | SQL suite integration: 85/85 PASS post-deploy | Yes |
+| Tier S evals | SQL suite integration: 142/142 PASS post-deploy | Yes |
 
 ## Relationship to the other workflows
 
 | Workflow | Owner / scope |
 | --- | --- |
-| `build.yml` (new) | Just the deployable image. Manual. |
-| `test.yml` (new) | Just the validation layers. Manual. |
-| `azure-infra-deploy.yml` (existing) | Terraform plan/apply/destroy for Dev infra |
-| `azure-migration-run.yml` (existing) | One-shot: build + deploy + run migration (legacy end-to-end) |
-| `azure-prod-*.yml` (existing) | Prod variants with reviewer gates |
+| `quality-gate.yml` | Lint, health check, pytest (unit/regression/security/snapshot), Tier P evals. Runs on push. |
+| `python-validator-tests.yml` | Windows `unittest discover` run for the CSV validator. Runs on push. |
 
-The new `build` + `test` workflows give you composable building blocks.
-The original `azure-migration-run.yml` still works as a single-button
-end-to-end run if you want that.
+These are the only two workflows in `.github/workflows/`. The `build.*` and
+`test.*` scripts in this directory are run locally; Azure infrastructure is
+provisioned with Terraform from `infra/terraform/` (see `AZURE_DEPLOY.md`).

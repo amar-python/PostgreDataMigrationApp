@@ -44,3 +44,9 @@ Thumbs.db
 # Exploratory / not-yet-wired folders
 _norton_/
 extend to Oracle dbs/
+
+# Runtime test artifacts (regenerate with scripts/test_report.py)
+tests/snapshots/
+tfplan
+*.tfplan
+terraform-provider-*.log

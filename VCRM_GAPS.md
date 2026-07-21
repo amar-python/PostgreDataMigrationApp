@@ -92,7 +92,7 @@ Recommended remediation priority across the 3 actionable gaps (excluding the 2 d
 
 - Adapter scripts exist at `build/adapters/adapter_<engine>.sh` for all six engines.
 - Engine-specific DDL exists at `build/schema/<engine>/`.
-- PostgreSQL is fully verified (Tier S asserts `85/85 PASS` post-deploy).
+- PostgreSQL is fully verified (Tier S asserts `142/142 PASS` post-deploy).
 
 ### What's NOT verified
 

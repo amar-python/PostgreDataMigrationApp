@@ -141,8 +141,8 @@ No code edits needed — just data files.
 cd "$env:USERPROFILE\OneDrive\Desktop\Migration using ai\PostgreDataMigrationApp\evals"
 
 # 1. Create dataset folder
-mkdir datasets\tier_p\21_rtl_arabic
-notepad datasets\tier_p\21_rtl_arabic\input.csv
+mkdir datasets\tier_p\24_rtl_arabic
+notepad datasets\tier_p\24_rtl_arabic\input.csv
 ```
 
 `input.csv`:
@@ -155,14 +155,14 @@ id,name
 
 ```powershell
 # 2. Create expected outcome
-notepad expected\tier_p\21_rtl_arabic.json
+notepad expected\tier_p\24_rtl_arabic.json
 ```
 
-`expected/tier_p/21_rtl_arabic.json`:
+`expected/tier_p/24_rtl_arabic.json`:
 
 ```json
 {
-  "scenario": "21_rtl_arabic",
+  "scenario": "24_rtl_arabic",
   "description": "Right-to-left Arabic text must survive the round-trip.",
   "runner_action": "default",
   "expected": {
@@ -178,7 +178,7 @@ notepad expected\tier_p\21_rtl_arabic.json
 
 ```powershell
 # 3. Run just that scenario
-python ..\evals\runner.py --only 21_rtl_arabic
+python ..\evals\runner.py --only 24_rtl_arabic
 ```
 
 ### Special runner_action values (Tier P)

@@ -16,7 +16,7 @@
 | `evals/datasets/tier_s/01_fresh_deploy_then_all_tests_pass/` | SQL-suite integration scenario |
 | `evals/expected/tier_p/*.json` | 23 expected-outcome files |
 | `evals/expected/tier_i/01_deploy_dev_twice.json` | Expected outcome (exit codes + row-count parity) |
-| `evals/expected/tier_s/01_fresh_deploy_then_all_tests_pass.json` | Expected outcome (85/85 + ALL TESTS PASSED) |
+| `evals/expected/tier_s/01_fresh_deploy_then_all_tests_pass.json` | Expected outcome (142/142 + ALL TESTS PASSED) |
 | `evals/reports/` | Auto-created at runtime; one folder per run with `summary.json` |
 
 ## What was executed
@@ -96,7 +96,7 @@ Tier I and S can be added when you have PostgreSQL in your CI runner.
 |------|--------------|
 | Tier X — cross-DB schema equivalence (MariaDB / SQLite / Teradata) | You explicitly said "ignore them for now" |
 | Tier E — cross-environment (Dev/Test/Staging/Prod) structural parity | Not needed until you ship beyond Dev |
-| Tier D — extended domain-rule evals beyond suite 05 | Existing 85 assertions already cover the high-value rules |
+| Tier D — extended domain-rule evals beyond suite 05 | Existing 142 assertions already cover the high-value rules |
 | Performance / scale (1M+ rows) | Would need a fixture generator — separate round |
 | AI-assisted anomaly detection | Out of scope for deterministic evals |
 | Single-field >128 KB | Current eval covers 50KB; larger-than-default `csv` field-size behavior remains future scope |

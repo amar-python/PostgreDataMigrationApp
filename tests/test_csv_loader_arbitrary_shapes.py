@@ -75,8 +75,13 @@ def _write_csv(path: Path, n_cols: int, n_rows: int) -> None:
             w.writerow([f"r{r}c{i}" for i in range(n_cols)])
 
 
-@unittest.skipUnless(_PG_AVAILABLE and _CONFIG_PRESENT, _SKIP_REASON)
 class CsvLoaderArbitraryShapes(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not (_PG_AVAILABLE and _CONFIG_PRESENT):
+            raise AssertionError(
+                f"{_SKIP_REASON}. Run 'bash scripts/provision_full_test_env.sh'.")
+
     """Loads CSVs of varying shape into Postgres and verifies row counts."""
 
     SHAPES = [
