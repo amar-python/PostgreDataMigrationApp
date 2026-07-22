@@ -36,7 +36,7 @@ variable "repos" {
   default = {
 
     "PostgreDataMigrationApp" = {
-      description = "Parameterised PostgreSQL framework for Defence T&E programme management — VCRM, TEMP, test execution, defect reporting, multi-environment deployment, 85-assertion SQL test suite"
+      description = "Parameterised PostgreSQL framework for T&E programme management — VCRM, TEMP, test execution, defect reporting, multi-environment deployment, 85-assertion SQL test suite"
       visibility  = "public"
       topics      = [
         "postgresql",
