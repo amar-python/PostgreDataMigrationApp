@@ -41,12 +41,10 @@ variable "repos" {
       topics      = [
         "postgresql",
         "sql",
-        "defence",
         "test-evaluation",
         "vcrm",
         "database",
         "devops",
-        "australian-defence",
         "idempotent",
         "multi-environment"
       ]
