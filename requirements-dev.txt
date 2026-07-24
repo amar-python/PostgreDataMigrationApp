@@ -1,6 +1,6 @@
 flake8>=6.0.0
 bandit[toml]>=1.7.9
-pytest>=7.4.0
+pytest>=9.1.1
 pytest-cov>=4.1.0
 
 # starlette's TestClient (used by tests/test_api.py) requires httpx2;
