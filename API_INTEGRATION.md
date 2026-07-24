@@ -176,11 +176,15 @@ python -m pytest tests/test_api.py                  # full
 python scripts/test_report.py --strict              # whole suite
 ```
 
-**Verification status:** the 12 `unit` tests were verified green against a
-faithful replica of the `api/` package structure. The 5 `integration` tests are
-written against the documented endpoint contracts but have **not** been run —
-they need the complete `api/` tree and the PostgreSQL 18 instance on port 5433
-that `start-api.ps1` targets. Run them before relying on them.
+**Verification status:** all 19 tests verified green against the real `api/`
+package and a live PostgreSQL 18 instance on port 5433 — 12 `unit` and 7
+`integration`, the latter exercising the upload → list → rows round trip, both
+deduplication paths (content hash and in-file row hash), and 404 handling for
+unregistered tables.
+
+The integration group needs `PGPASSWORD` set in the shell; `start-api.ps1`
+prompts for it interactively, but pytest does not. Without it the suite fails
+with remediation text rather than skipping, per the no-skip policy.
 
 ## Also required
 

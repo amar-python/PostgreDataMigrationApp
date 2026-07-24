@@ -35,8 +35,11 @@ from api.main import app
 
 client = TestClient(app)
 
-_HELP = ("Start PostgreSQL and ensure api/ can reach it "
-         "(PGHOST/PGPORT/PGUSER/PGPASSWORD — see scripts/start-api.ps1).")
+_HELP = ("Start PostgreSQL and ensure api/ can reach it. Most often this means "
+         "PGPASSWORD is not set in this shell:\n"
+         "    PowerShell:  $env:PGPASSWORD = '<password>'\n"
+         "    bash:        export PGPASSWORD='<password>'\n"
+         "Defaults come from api/config.py; see scripts/start-api.ps1.")
 
 SMALL_CSV = "col_a,col_b\n1,2\n3,4\n"
 
@@ -157,7 +160,17 @@ class CsvPipelineWithDatabase(unittest.TestCase):
         # runs and db.init_pool() is called. Without it every request raises
         # "DB pool not initialised".
         cls.ctx = TestClient(app)
-        cls.client = cls.ctx.__enter__()
+        try:
+            cls.client = cls.ctx.__enter__()
+        except Exception as exc:  # noqa: BLE001
+            # Lifespan runs db.init_pool(); a connection failure surfaces here
+            # as a raw driver error. Re-raise with remediation instead, so the
+            # no-skip policy produces something actionable.
+            raise AssertionError(
+                f"Could not start the API — database connection failed.\n"
+                f"  {type(exc).__name__}: {str(exc).strip().splitlines()[0]}\n"
+                f"{_HELP}"
+            ) from None
         if cls.client.get("/api/health").json().get("status") != "ok":
             cls.ctx.__exit__(None, None, None)
             raise AssertionError(f"API reports the database is unreachable. {_HELP}")
