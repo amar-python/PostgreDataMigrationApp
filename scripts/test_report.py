@@ -65,6 +65,13 @@ def _collect_all_ids() -> set[str]:
 
 
 def _run(markers: str | None, xml_path: Path) -> int:
+    """Run pytest and return its exit code.
+
+    Exit code 2 means the run was INTERRUPTED (typically a collection error),
+    which is materially different from tests being deselected — nothing ran at
+    all. The final block distinguishes the two so a broken import is not
+    reported as a marker filter.
+    """
     cmd = [sys.executable, "-m", "pytest", f"--junitxml={xml_path}", "-q", "--no-header"]
     if markers:
         cmd += ["-m", markers]
@@ -109,8 +116,11 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         xml_path = Path(td) / "results.xml"
         all_ids = _collect_all_ids()
-        _run(args.markers, xml_path)
+        exit_code = _run(args.markers, xml_path)
         passed, failed, errored, skipped = _parse(xml_path)
+
+    # pytest's own exit code 2 == interrupted, e.g. a collection error.
+    interrupted = exit_code == 2
 
     executed = {_norm(t) for t in passed} \
         | {_norm(t) for t, _ in failed} \
@@ -129,7 +139,9 @@ def main() -> int:
     print(f"  {RED}FAILED{NC}        : {len(failed)}")
     print(f"  {RED}ERROR{NC}         : {len(errored)}")
     print(f"  {YELLOW}SKIPPED{NC}       : {len(skipped)}")
-    print(f"  {DIM}NOT RUN{NC}       : {len(not_run)}  {DIM}(deselected by the marker filter){NC}")
+    not_run_reason = ("run INTERRUPTED before they could execute"
+                      if interrupted else "deselected by the marker filter")
+    print(f"  {DIM}NOT RUN{NC}       : {len(not_run)}  {DIM}({not_run_reason}){NC}")
 
     for label, colour, items in (("FAILED", RED, failed), ("ERROR", RED, errored)):
         if items:
@@ -152,12 +164,17 @@ def main() -> int:
     if not_run:
         for tid in not_run:
             print(f"    {DIM}- {tid}{NC}")
-        print(f"    {DIM}Deselected by the marker filter, not skipped. They must"
-              f" run in another job.{NC}")
+        if interrupted:
+            print(f"    {RED}The run was interrupted (exit code 2) — most often a"
+                  f" collection error above. These tests never executed.{NC}")
+        else:
+            print(f"    {DIM}Deselected by the marker filter, not skipped. They must"
+                  f" run in another job.{NC}")
     else:
         print(f"    {GREEN}none — every collected test was executed{NC}")
 
-    ok = not failed and not errored and not (args.strict and skipped)
+    ok = (not failed and not errored and not interrupted
+          and not (args.strict and skipped))
     print(f"\n{bar}")
     print(f"  {(GREEN + 'RESULT: PASS') if ok else (RED + 'RESULT: FAIL')}{NC}")
     print(f"{bar}\n")

@@ -236,13 +236,19 @@ def upload_dynamic(
                 insert_cols = sql.SQL(", ").join(
                     [sql.Identifier(c) for c in columns] + [sql.Identifier("_row_hash")]
                 )
+                # RETURNING + fetch=True is deliberate: execute_values pages at 100
+                # by default and cur.rowcount reflects only the last page, which
+                # under-counted every file over 100 rows. Counting returned rows is
+                # page-size independent. See DEFECT_INSERTED_ROWS.md.
                 stmt = sql.SQL(
-                    "INSERT INTO {}.{} ({}) VALUES %s ON CONFLICT (_row_hash) DO NOTHING"
+                    "INSERT INTO {}.{} ({}) VALUES %s "
+                    "ON CONFLICT (_row_hash) DO NOTHING RETURNING 1"
                 ).format(sql.Identifier(schema), sql.Identifier(table_name), insert_cols)
                 for i in range(0, len(to_insert), 500):
                     chunk = to_insert[i : i + 500]
-                    execute_values(cur, stmt.as_string(cur), chunk)
-                    inserted += cur.rowcount if cur.rowcount >= 0 else len(chunk)
+                    returned = execute_values(
+                        cur, stmt.as_string(cur), chunk, fetch=True)
+                    inserted += len(returned)
             _log(logs, "insert", f"Inserted {inserted} rows", count=inserted)
 
             # Register
