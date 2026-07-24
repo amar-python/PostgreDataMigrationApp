@@ -20,7 +20,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install dev dependencies
-        run: pip install -r requirements-dev.txt
+        # api/requirements.txt is needed too: tests/test_api.py imports FastAPI
+        # at module level, so without it pytest collection fails.
+        run: pip install -r requirements-dev.txt -r api/requirements.txt
 
       # Database-backed tests (integration/e2e/parity) run in the Linux
       # integration-postgres job of quality-gate.yml, which has a PostgreSQL

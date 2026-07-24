@@ -16,6 +16,6 @@ if (-not $env:PGPASSWORD) {
         [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
 }
 
-Set-Location $apiDir
+Set-Location (Join-Path $PSScriptRoot "..")
 Write-Host "API starting on http://localhost:8000  (docs: /docs)" -ForegroundColor Green
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn api.main:app --reload --port 8000

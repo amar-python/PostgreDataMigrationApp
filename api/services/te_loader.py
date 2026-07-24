@@ -12,9 +12,9 @@ import time
 
 from psycopg2 import sql
 
-from config import TE_TABLES, settings
-from db import Conn
-from services.csv_parse import parse_csv, sanitize_columns
+from api.config import TE_TABLES, settings
+from api.db import Conn
+from api.services.csv_parse import parse_csv, sanitize_columns
 
 
 def _log(logs: list, step: str, message: str, level: str = "info", count: int | None = None):

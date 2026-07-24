@@ -13,9 +13,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import db
-from config import settings
-from routers import csv_routes, te_routes
+from api import db
+from api.config import settings
+from api.routers import csv_routes, te_routes
 
 
 @asynccontextmanager

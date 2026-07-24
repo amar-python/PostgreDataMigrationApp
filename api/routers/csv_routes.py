@@ -6,11 +6,11 @@ from fastapi import APIRouter, HTTPException
 from psycopg2 import sql
 from pydantic import BaseModel, Field
 
-from config import settings
-from db import Conn
-from services.csv_parse import build_preview
-from services.dynamic_loader import upload_dynamic
-from services.te_loader import match_te_table, upload_te
+from api.config import settings
+from api.db import Conn
+from api.services.csv_parse import build_preview
+from api.services.dynamic_loader import upload_dynamic
+from api.services.te_loader import match_te_table, upload_te
 
 router = APIRouter(prefix="/api/csv", tags=["csv"])
 

@@ -15,9 +15,9 @@ import time
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 
-from config import settings
-from db import Conn
-from services.csv_parse import (
+from api.config import settings
+from api.db import Conn
+from api.services.csv_parse import (
     ALLOWED_TYPES,
     cast_value,
     parse_csv,

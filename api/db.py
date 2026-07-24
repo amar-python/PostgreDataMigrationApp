@@ -4,7 +4,7 @@ import psycopg2
 import psycopg2.pool
 from psycopg2 import sql
 
-from config import settings
+from api.config import settings
 
 _pool: psycopg2.pool.SimpleConnectionPool | None = None
 

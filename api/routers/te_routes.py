@@ -3,8 +3,8 @@
 from fastapi import APIRouter
 from psycopg2 import sql
 
-from config import TE_TABLES, settings
-from db import Conn
+from api.config import TE_TABLES, settings
+from api.db import Conn
 
 router = APIRouter(prefix="/api/te", tags=["te"])
 

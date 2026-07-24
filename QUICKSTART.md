@@ -56,7 +56,8 @@ bash build\deploy_all.sh dev
 ```
 
 On success you should see `ALL ENVIRONMENTS DEPLOYED` and the new database
-`te_dev` with schema `te_dev` containing the 6 core tables.
+`te_mgmt_dev` with schema `te_dev` containing the 12 core tables. (Running the
+SQL suite later adds a 13th, `test_run_results`, used to record assertions.)
 
 ## Run the eval suite
 
