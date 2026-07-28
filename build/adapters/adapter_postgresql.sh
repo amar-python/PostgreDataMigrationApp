@@ -17,7 +17,7 @@ SCHEMA_FILE="${SCRIPT_DIR}/schema/postgresql/te_core_schema.sql"
 PSQL_OPTS="-h ${PG_HOST} -p ${PG_PORT} -U ${PG_SUPERUSER}"
 [[ -n "${PG_SUPERUSER_PASSWORD:-}" ]] && export PGPASSWORD="${PG_SUPERUSER_PASSWORD}"
 
-get() { local E="${1^^}"; eval echo "\${PG_${2}_${E}}"; }
+get() { local E="${1^^}"; local _v="PG_${2}_${E}"; echo "${!_v:-}"; }
 
 SUCCEEDED=(); FAILED=()
 

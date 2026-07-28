@@ -22,7 +22,7 @@ claim below was reproduced, not inferred from reading code.
 | G2 | Windows CI cannot run database-backed tests | Medium | Yes — accept scope, or start PG on the runner |
 | G3 | Tiers X and E remain unimplemented | Medium | No — deferred by design |
 | G4 | ~~Runtime artifacts are not gitignored~~ | **Closed** | Added to `.gitignore` |
-| G5 | `VCRM.md` BR-20 assertion count edited | Low | Yes — confirm or revert |
+| G5 | ~~`VCRM.md` BR-20 assertion count edited~~ | **Closed** | Confirmed: 142 matches suite output and Tier S JSON |
 
 ---
 
@@ -68,12 +68,11 @@ now runs against all four PostgreSQL environments.
 **Resolution:** All four suggested entries were added to `.gitignore`:
 `tests/snapshots/`, `tfplan`, `*.tfplan`, `terraform-provider-*.log`.
 
-### G5 — `VCRM.md` BR-20 edited (Low)
+### G5 — `VCRM.md` BR-20 assertion count (Closed)
 
-BR-20 read "85 of 85 assertions passing"; the suite reports **142** and the
-Tier S expectation JSON already specified 142. Updated to match observed
-behaviour. Flagged because `VCRM.md` is a formal traceability document — revert
-if that figure is contractually fixed.
+**Resolution:** Confirmed. The suite reports **142** assertions and the
+Tier S expectation JSON specifies 142. The old "85 of 85" was stale; the
+update to 142 is correct. No revert needed.
 
 ---
 
