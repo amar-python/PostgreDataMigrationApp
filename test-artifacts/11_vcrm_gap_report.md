@@ -51,7 +51,7 @@ Reflects this run's outcomes only. For the static catalogue see `VCRM.md` and `V
 | BR-17 | OK | Graceful degradation when PG unavailable | tier_i/01_deploy_dev_twice: PASS; tier_s/01_fresh_deploy_then_all_tests_pass: PASS |
 | BR-18 | OK | Machine-readable JSON report per run | Implicit (Inspection) |
 | BR-19 | OK | Build/tests/evals physically segregated | Implicit (Inspection) |
-| BR-20 | OK | 85/85 SQL assertions pass | tier_s/01_fresh_deploy_then_all_tests_pass: PASS |
+| BR-20 | OK | 142/142 SQL assertions pass | tier_s/01_fresh_deploy_then_all_tests_pass: PASS |
 | BR-21 | DEFERRED | Cross-engine schema equivalence | - |
 | BR-22 | DEFERRED | Performance at >= 1M rows | - |
 

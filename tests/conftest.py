@@ -6,7 +6,11 @@ where one test sets CSV_FILE / PGPASSWORD / PATH and leaks that value into
 an unrelated downstream test.
 """
 import os
+import sys
+from pathlib import Path
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Env vars tests are allowed to mutate; restored after every test.
 _RESTORE_KEYS = (

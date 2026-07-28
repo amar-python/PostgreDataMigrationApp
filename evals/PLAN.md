@@ -121,7 +121,7 @@ Exit code: 0 if all scenarios in selected tiers pass, 1 otherwise. CI-friendly.
 
 ## What this DOES NOT do
 
-- Doesn't replace the existing 85-assertion SQL suite under `tests/suites/` — Tier S runs those after a fresh deploy and counts the pass total.
+- Doesn't replace the existing 142-assertion SQL suite under `tests/suites/` — Tier S runs those after a fresh deploy and counts the pass total.
 - Doesn't replace the Python unit tests in `tests/` — Tier P is broader (23 scenarios), while unit tests keep fast in-Python coverage for the validator and eval runner.
 - Doesn't include performance/load testing yet (scope creep — separate suite if needed later).
 

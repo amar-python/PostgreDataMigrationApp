@@ -122,7 +122,7 @@ Located in `evals/datasets/tier_s/`. Requires reachable PostgreSQL; skips cleanl
 
 | # | Scenario | What it tests | Expected outcome |
 |---|----------|--------------|------------------|
-| 01 | `01_fresh_deploy_then_all_tests_pass` | Deploys Dev fresh; runs `tests/run_all_tests.sql` with all `--set` table-name overrides; parses the suite output | `deploy_exit_code: 0`, `tests_exit_code: 0`, stdout contains `ALL TESTS PASSED`, `min_total_assertions: 85`, `min_pass_rate_percent: 100.0`. Proves the deployed system is correct end-to-end. |
+| 01 | `01_fresh_deploy_then_all_tests_pass` | Deploys Dev fresh; runs `tests/run_all_tests.sql` with all `--set` table-name overrides; parses the suite output | `deploy_exit_code: 0`, `tests_exit_code: 0`, stdout contains `ALL TESTS PASSED`, `min_total_assertions: 142`, `min_pass_rate_percent: 100.0`. Proves the deployed system is correct end-to-end. |
 
 ---
 
