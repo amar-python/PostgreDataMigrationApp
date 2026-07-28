@@ -312,7 +312,7 @@ class OverwriteUpload(_IntegrationBase):
 class TeUploadPipeline(_IntegrationBase):
     """POST /api/csv/upload with mode=te against a deployed T&E schema."""
 
-    def _org_csv(self, name_val, org_type="Government", country="AU"):
+    def _org_csv(self, name_val, org_type="government", country="AU"):
         return f"name,org_type,country\n{name_val},{org_type},{country}\n"
 
     def test_successful_upload_to_organisations(self):
