@@ -92,7 +92,7 @@ For each requirement, the columns mark which test layer verifies it. Numbers in 
 | BR-12 | Clearance enum {baseline, NV1, NV2, PV} | — | suite 01 (CHECK / enum assertions on personnel) | — | — | 01 | — | ✅ | |
 | BR-13 | ISM classification marking enum | — | suite 02 (classification assertions on test_programs) | — | — | 01 | — | ✅ | |
 | BR-14 | Phase type enum | — | suite 02 (phase_type assertions on test_phases) | — | — | 01 | — | ✅ | |
-| BR-15 | Per-env connection limits | — | — | — | — | — | — | ❌ | The limit is set in `env_*.sql` but no test asserts it. Would need a `\d` introspection check. |
+| BR-15 | Per-env connection limits | — | **suite 05 (S09: app role exists, S10: rolconnlimit matches)** | — | — | 01 | — | ✅ | Assertions S09/S10 verify `pg_roles.rolconnlimit` matches the env's configured `conn_limit`. |
 | BR-16 | Automated single-command regression | — | — | All TP (single `runner.py` invocation) | 01 | 01 | — | ✅ | Combined `runner.py --tiers p,i,s` is the entry point. |
 | BR-17 | Graceful degradation when PG unavailable | 9, 11 | — | — | (skip behaviour) | (skip behaviour) | — | ✅ | Python unit tests directly assert the skip path. |
 | BR-18 | Machine-readable JSON report per run | 5, 6 | — | — | — | — | — | ✅ | Verified by `_load_expected` and `discover_scenarios` unit tests; the report write itself is exercised by every Tier P run. |
@@ -122,7 +122,7 @@ The `input_data/` loader has its own implicit requirements — verified end-to-e
 | Layer | Requirements with at least one cell ticked | % of in-scope requirements (BR-01..BR-20) |
 |-------|-------------------------------------------|-------------------------------------------|
 | Python unit (PU) | 5 (BR-10/11/17/18) | 25 % |
-| SQL suites (SQL) | 11 (BR-01/03/04/05/06/07/08/12/13/14/20) | 55 % |
+| SQL suites (SQL) | 12 (BR-01/03/04/05/06/07/08/12/13/14/15/20) | 60 % |
 | Tier P (TP) | 4 (BR-10/11/16/18) | 20 % |
 | Tier I (TI) | 4 (BR-04/09/16/17) | 20 % |
 | Tier S (TS) | 13 (BR-01/03/04/05/06/07/08/09/12/13/14/16/20) | 65 % |
@@ -132,11 +132,11 @@ The `input_data/` loader has its own implicit requirements — verified end-to-e
 
 | Status | Count | Requirements |
 |--------|-------|-------------|
-| ✅ Verified | 17 | BR-03, BR-04, BR-05, BR-06, BR-07, BR-08, BR-09, BR-10, BR-11, BR-12, BR-13, BR-14, BR-16, BR-17, BR-18, BR-19, BR-20 |
+| ✅ Verified | 18 | BR-03, BR-04, BR-05, BR-06, BR-07, BR-08, BR-09, BR-10, BR-11, BR-12, BR-13, BR-14, BR-15, BR-16, BR-17, BR-18, BR-19, BR-20 |
 | ⚠️ Partial | 1 | BR-01 |
-| ❌ Not verified | 4 | BR-02, BR-15, BR-21, BR-22 |
+| ❌ Not verified | 3 | BR-02, BR-21, BR-22 |
 
-**Headline:** **17 of 22 (77 %)** business requirements are fully verified by at least one automated test condition. Of the 5 not fully verified, 2 are deferred by design (BR-21, BR-22) and 3 are genuine gaps (BR-01 partial, BR-02 unverified, BR-15 unverified).
+**Headline:** **18 of 22 (82 %)** business requirements are fully verified by at least one automated test condition. Of the 4 not fully verified, 2 are deferred by design (BR-21, BR-22), 1 is a genuine gap (BR-02 unverified), and 1 is partial (BR-01).
 
 ---
 
@@ -148,7 +148,7 @@ The `input_data/` loader has its own implicit requirements — verified end-to-e
 |-----|-----|--------------------------|--------|
 | **BR-01 partial** | Test/Staging/Prod environments are deployable but their structural equivalence to Dev is not asserted by any test. A change in `env_test.sql` that drifts from `env_dev.sql` would not be caught. | Add a Tier E scenario `01_envs_have_identical_structure` that deploys all four envs, queries `information_schema.columns` for each, and diffs the structure. | Medium (1 day) |
 | **BR-02** | The framework claims to support 6 DB engines via adapters, but no test runs against MariaDB / SQLite / etc. | Add a Tier X scenario per engine. Earliest wins: SQLite (no service needed, just a file). | Medium per engine |
-| **BR-15** | The per-environment `conn_limit` value lives in `env_*.sql` but no test confirms it's applied. | Add a SQL assertion in suite 05: `SELECT rolconnlimit FROM pg_roles WHERE rolname = :'app_user'` and `assert_equals(..., <expected limit>)`. | Small (~1 hour) |
+| ~~**BR-15**~~ | ~~The per-environment `conn_limit` value lives in `env_*.sql` but no test confirms it's applied.~~ | **Closed.** Assertions S09 and S10 in `test_05_schema_and_business_rules.sql` now verify `pg_roles.rolconnlimit` matches the env's configured `conn_limit`. | — |
 
 ### Deliberately deferred
 
