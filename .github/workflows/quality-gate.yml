@@ -153,3 +153,130 @@ jobs:
           path: evals/reports/
           if-no-files-found: ignore
           retention-days: 30
+
+  # Windows surface: starts the pre-installed PostgreSQL service, provisions
+  # databases, and runs the full suite + Tier P evals. Proves the pipeline
+  # works on Windows and closes GAP_ANALYSIS.md G2.
+  windows-postgres:
+    name: windows (postgres, full suite)
+    runs-on: windows-latest
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt -r api/requirements.txt
+
+      - name: Start PostgreSQL service
+        shell: pwsh
+        run: |
+          $pgService = Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $pgService) {
+            Write-Error "No PostgreSQL service found on this runner"
+            exit 1
+          }
+          Write-Host "Found service: $($pgService.Name) (status: $($pgService.Status))"
+          if ($pgService.Status -ne 'Running') {
+            Start-Service $pgService.Name
+            Start-Sleep -Seconds 5
+          }
+          $pgService = Get-Service $pgService.Name
+          Write-Host "Service status: $($pgService.Status)"
+
+      - name: Set postgres password and verify connection
+        shell: pwsh
+        run: |
+          $pgDir = (Get-ItemProperty 'HKLM:\SOFTWARE\PostgreSQL\Installations\*' -ErrorAction SilentlyContinue |
+            Select-Object -First 1).Base_Directory
+          if (-not $pgDir) {
+            $pgDir = (Get-ChildItem "C:\Program Files\PostgreSQL\*\bin\psql.exe" -ErrorAction SilentlyContinue |
+              Select-Object -First 1).Directory.Parent.FullName
+          }
+          $binDir = Join-Path $pgDir "bin"
+          $dataDir = Join-Path $pgDir "data"
+          Write-Host "PostgreSQL bin: $binDir"
+          echo "$binDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          # Set password for the postgres superuser
+          & "$binDir\psql" -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
+          # Enable password auth
+          $hbaPath = Join-Path $dataDir "pg_hba.conf"
+          if (Test-Path $hbaPath) {
+            (Get-Content $hbaPath) -replace 'trust$','md5' | Set-Content $hbaPath
+            & "$binDir\pg_ctl" -D $dataDir reload
+            Start-Sleep -Seconds 2
+          }
+          & "$binDir\psql" -U postgres -c "SELECT version();"
+
+      - name: Write CI database config
+        shell: pwsh
+        run: |
+          @"
+          DB_ENGINE="postgresql"
+          PG_HOST="localhost"
+          PG_PORT="5432"
+          PG_SUPERUSER="postgres"
+          PG_SUPERUSER_PASSWORD="postgres"
+          PG_DB_DEV="te_mgmt_dev"
+          PG_SCHEMA_DEV="te_dev"
+          PG_DB_TEST="te_mgmt_test"
+          PG_SCHEMA_TEST="te_test"
+          PG_DB_STAGING="te_mgmt_staging"
+          PG_SCHEMA_STAGING="te_staging"
+          PG_DB_PROD="te_mgmt_prod"
+          PG_SCHEMA_PROD="te_prod"
+          "@ | Out-File -FilePath "build/config.local.env" -Encoding utf8
+
+      - name: Materialise environment launchers from templates
+        shell: pwsh
+        run: |
+          foreach ($env_name in @("dev", "test", "staging", "prod")) {
+            Copy-Item "build/environments/env_${env_name}.example.sql" `
+                      "build/environments/env_${env_name}.sql"
+          }
+          Get-ChildItem build/environments/
+
+      - name: Create environment databases
+        shell: pwsh
+        run: |
+          foreach ($db in @("te_mgmt_dev", "te_mgmt_test", "te_mgmt_staging", "te_mgmt_prod")) {
+            $exists = & psql -U postgres -d postgres -tA -c "SELECT 1 FROM pg_database WHERE datname = '$db'"
+            if (-not $exists) {
+              & psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c `
+                "CREATE DATABASE `"$db`" WITH OWNER = postgres ENCODING = 'UTF8' TEMPLATE = template0 CONNECTION LIMIT = -1"
+            }
+          }
+
+      - name: Evals — Tier P (offline validator scenarios)
+        run: python3 evals/runner.py --tiers p --verbose
+
+      - name: Deploy all environments (for cross-env parity)
+        shell: bash
+        run: |
+          for env in dev test staging prod; do
+            bash build/deploy_all.sh "$env"
+          done
+
+      - name: Full test suite — final result with skip accounting
+        run: python3 scripts/test_report.py --strict
+
+      - name: Upload eval reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-reports-windows
+          path: evals/reports/
+          if-no-files-found: ignore
+          retention-days: 30
