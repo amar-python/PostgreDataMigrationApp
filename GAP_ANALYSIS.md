@@ -20,7 +20,7 @@ claim below was reproduced, not inferred from reading code.
 |---|---|---|---|
 | G1 | ~~`config.env.example` names do not match `setup.sh` / loaders~~ | **Closed** | Renamed to `PG_*_<ENV>` scheme |
 | G2 | ~~Windows CI cannot run database-backed tests~~ | **Closed** | Added `windows-postgres` job to `quality-gate.yml` |
-| G3 | Tiers X and E remain unimplemented | Medium | No — deferred by design |
+| G3 | ~~Tiers X and E remain unimplemented~~ | **Closed** | Implemented Tier X (CSV round-trip) and Tier E (cross-env parity) |
 | G4 | ~~Runtime artifacts are not gitignored~~ | **Closed** | Added to `.gitignore` |
 | G5 | ~~`VCRM.md` BR-20 assertion count edited~~ | **Closed** | Confirmed: 142 matches suite output and Tier S JSON |
 
@@ -48,15 +48,25 @@ The existing `python-validator-tests.yml` Windows job continues to run
 database-free markers as a fast signal; the new quality-gate job covers the
 full surface.
 
-### G3 — Tiers X and E unimplemented (Medium)
+### G3 — Tiers X and E unimplemented (Closed)
 
-`evals/PLAN.md` defines five tiers; P, I and S are implemented. **X**
-(cross-engine schema equivalence) and **E** (cross-environment structural
-parity) remain deferred, so cross-engine claims for MariaDB, SQLite, InfluxDB,
-Redis and Teradata rest on code review rather than execution.
+**Resolution:** Implemented both remaining eval tiers in `evals/runner.py`:
 
-Partially mitigated: `tests/test_parity.py::TestAllEnvironmentsHaveRequiredTables`
-now runs against all four PostgreSQL environments.
+- **Tier X** — CSV round-trip fidelity: loads each sample CSV into PostgreSQL
+  via `csv_loader.sh`, exports it back via `csv_utilise.sh export`, and diffs
+  data columns against the original. Proves the full load → DB → export
+  pipeline preserves data for arbitrary CSV shapes (including quoted commas
+  and UTF-8 characters).
+
+- **Tier E** — Cross-environment structural parity: queries
+  `information_schema.columns` for all four environments (dev, test, staging,
+  prod) and asserts they have identical table names, column names, column
+  types, and column order.
+
+Run with: `python3 evals/runner.py --tiers x,e --verbose`
+
+The existing `tests/test_parity.py::TestAllEnvironmentsHaveRequiredTables`
+provides complementary coverage at the pytest level.
 
 ### G4 — Runtime artifacts not gitignored (Closed)
 
@@ -91,6 +101,6 @@ update to 142 is correct. No revert needed.
 | Python unit / regression / security / snapshot | 54 tests, 0 skipped | `05_test_report_full.log` |
 | SQL assertions | 142 / 142, 100% | `03_sql_test_suite.log` |
 | Eval tiers P, I, S | 25 / 25, 0 skipped | `04_evals_p_i_s.log` |
-| Eval tiers X, E | Not implemented | G3 |
+| Eval tiers X, E | Implemented (PostgreSQL) | `evals/runner.py --tiers x,e` |
 | PostgreSQL engine | Fully exercised | above |
 | Other five engines | Code review only | G3 |

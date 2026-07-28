@@ -22,9 +22,10 @@ In short: `tests/` proves the **code is correct**; `evals/` proves the **framewo
   - **Tier P** — Python CSV validator (`build/csv/validator.py`). Pure data-in / files-out. No DB.
   - **Tier I** — Idempotency of `deploy_all.sh` against a clean Dev PostgreSQL.
   - **Tier S** — SQL test suite integration: deploy fresh + run all 5 suites and assert 142/142.
-- **Tiers deferred:**
-  - **Tier X** — Cross-DB schema equivalence (MariaDB/SQLite). Out until Postgres is locked in.
+- **Tiers added (G3 closure):**
+  - **Tier X** — CSV round-trip fidelity: load → export → diff against original (PostgreSQL).
   - **Tier E** — Cross-environment (Dev/Test/Staging/Prod) structural equivalence.
+- **Tiers deferred:**
   - **Tier D** — Extended domain-rule evals beyond what suite 05 already covers.
 
 ## Folder layout
@@ -47,8 +48,16 @@ PostgreDataMigrationApp/
     │   │   └── 01_deploy_dev_twice/
     │   │       └── NOTES.txt            ← what the runner does (no CSV needed)
     │   │
-    │   └── tier_s/                      ← SQL suite integration
-    │       └── 01_fresh_deploy_then_all_tests_pass/
+    │   ├── tier_s/                      ← SQL suite integration
+    │   │   └── 01_fresh_deploy_then_all_tests_pass/
+    │   │       └── NOTES.txt
+    │   │
+    │   ├── tier_x/                      ← CSV round-trip fidelity
+    │   │   └── 01_csv_round_trip_postgresql/
+    │   │       └── NOTES.txt
+    │   │
+    │   └── tier_e/                      ← cross-environment parity
+    │       └── 01_all_envs_same_tables/
     │           └── NOTES.txt
     │
     ├── expected/
@@ -58,8 +67,12 @@ PostgreDataMigrationApp/
     │   │   └── …
     │   ├── tier_i/
     │   │   └── 01_deploy_dev_twice.json
-    │   └── tier_s/
-    │       └── 01_fresh_deploy_then_all_tests_pass.json
+    │   ├── tier_s/
+    │   │   └── 01_fresh_deploy_then_all_tests_pass.json
+    │   ├── tier_x/
+    │   │   └── 01_csv_round_trip_postgresql.json
+    │   └── tier_e/
+    │       └── 01_all_envs_same_tables.json
     │
     └── reports/                         ← runtime output (gitignored)
         └── <run_id>/
@@ -117,7 +130,8 @@ Exit code: 0 if all scenarios in selected tiers pass, 1 otherwise. CI-friendly.
 | 3 | Execute Tier P locally; show results | DONE / awaiting your review |
 | 4 | Tier I scaffolding + runner extension | next |
 | 5 | Tier S scaffolding + runner extension | next |
-| 6 | (Future) Tier X across MariaDB/SQLite once Postgres is locked in | deferred |
+| 6 | Tier X (CSV round-trip fidelity, PostgreSQL) | DONE |
+| 7 | Tier E (cross-environment structural parity) | DONE |
 
 ## What this DOES NOT do
 

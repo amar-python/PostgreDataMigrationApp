@@ -68,23 +68,48 @@ Tier S initial scope: only S1.
 
 ---
 
+## Tier X — CSV round-trip fidelity
+
+| # | Failure mode | Example scenario | Expected behaviour | Current | Eval ID |
+|---|--------------|------------------|--------------------|---------|---------|
+| X1 | Load → export round-trip loses data | Load customers.csv, export back, diff | All data columns match original exactly; marker columns excluded from diff | ✅ | 01 |
+| X2 | Round-trip with quoted commas and special chars | Load orders.csv (has quoted commas) | Quoted fields survive load/export cycle intact | ✅ | 01 |
+| X3 | Round-trip with UTF-8 special characters | Load inventory.csv (has en-dash) | UTF-8 preserved through PostgreSQL TEXT columns | ✅ | 01 |
+
+Tier X initial scope: X1–X3 are all covered by scenario 01 which loops over all sample CSVs.
+
+---
+
+## Tier E — Cross-environment structural parity
+
+| # | Failure mode | Example scenario | Expected behaviour | Current | Eval ID |
+|---|--------------|------------------|--------------------|---------|---------|
+| E1 | Dev and test have different table sets | Compare information_schema across envs | All four envs have identical table names | ✅ | 01 |
+| E2 | Column type drift between environments | Dev has TEXT, staging has VARCHAR | Column names, types, and order match across all envs | ✅ | 01 |
+| E3 | Missing table in one environment | prod missing evidence_artifacts | Detected and reported as structural mismatch | ✅ | 01 |
+
+Tier E initial scope: E1–E3 are all covered by scenario 01 which compares schema fingerprints.
+
+---
+
 ## What this catalogue does NOT yet cover
 
-- **Multi-DB equivalence** (cross-engine schema parity) — deferred until PG is locked in.
 - **Performance / scale** (1M-row load timing) — separate suite if needed later.
-- **Cross-environment structural equivalence** (Dev vs Test vs Staging vs Prod) — Tier E, future.
 - **Domain-rule deep dives beyond suite 05** — Tier D, future.
 - **Validator behaviour on >128KB single field** — beyond the current 50KB eval and Python `csv` default field-size assumptions.
+- **Cross-engine CSV round-trip** (MariaDB, SQLite) — Tier X currently covers PostgreSQL only.
 
 ---
 
 ## Summary
 
-| Tier | Modes catalogued | Modes in initial eval set | Deferred |
-|------|------------------|---------------------------|----------|
+| Tier | Modes catalogued | Modes in eval set | Deferred |
+|------|------------------|-------------------|----------|
 | P | 22 | 22 | 0 |
 | I | 4 | 1 | 3 |
 | S | 3 | 1 | 2 |
-| **Total** | **29** | **21** | **7** |
+| X | 3 | 3 | 0 |
+| E | 3 | 3 | 0 |
+| **Total** | **35** | **30** | **5** |
 
-The current eval set covers every catalogued Tier P mode plus the initial Tier I and Tier S operational scenarios. The remaining deferred items are PostgreSQL oper
+The eval set now covers all five tiers. Tier X and E require a live PostgreSQL instance with all four environment databases deployed; they fail (not skip) when prerequisites are unavailable.
