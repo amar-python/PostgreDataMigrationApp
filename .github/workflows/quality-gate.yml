@@ -273,9 +273,6 @@ jobs:
             }
           }
 
-      - name: Evals — Tier P (offline validator scenarios)
-        run: python3 evals/runner.py --tiers p --verbose
-
       - name: Deploy all environments (for cross-env parity)
         shell: bash
         run: |
@@ -283,8 +280,11 @@ jobs:
             bash build/deploy_all.sh "$env"
           done
 
-      - name: Evals — Tiers X, E (post-deploy)
+      - name: Evals — Tiers X, E (post-deploy, before test artifacts)
         run: python3 evals/runner.py --tiers x,e --verbose
+
+      - name: Evals — Tier P (offline validator scenarios)
+        run: python3 evals/runner.py --tiers p --verbose
 
       - name: Full test suite — final result with skip accounting
         run: python3 scripts/test_report.py --strict
@@ -297,4 +297,5 @@ jobs:
           path: evals/reports/
           if-no-files-found: ignore
           retention-days: 30
+
 
