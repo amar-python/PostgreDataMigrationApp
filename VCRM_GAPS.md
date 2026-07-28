@@ -11,17 +11,18 @@ Companion to `VCRM.md`. Lists only the 5 business requirements that are **not fu
 | Category | Count | Requirement IDs |
 |----------|-------|-----------------|
 | ⚠️ **Partial coverage** — some aspects verified, some open | 1 | BR-01 |
-| ❌ **Genuine gap** — no automated coverage, work needed | 2 | BR-02, BR-15 |
+| ❌ **Genuine gap** — no automated coverage, work needed | 1 | BR-02 |
 | ❌ **Deferred by design** — out of scope by project decision | 2 | BR-21, BR-22 |
-| **Total gaps** | **5 of 22** (23 %) | |
+| **Total gaps** | **4 of 22** (18 %) | |
 
-**Coverage from the VCRM:** 17 of 22 (77 %) requirements fully verified by ≥ 1 automated test condition.
+**Coverage from the VCRM:** 18 of 22 (82 %) requirements fully verified by ≥ 1 automated test condition.
 
-Recommended remediation priority across the 3 actionable gaps (excluding the 2 deferred ones):
+Recommended remediation priority across the 2 actionable gaps (excluding the 2 deferred ones):
 
-1. **BR-15** — 1 hour, blocks nothing, removes a documented claim with no current test. **Do first.**
-2. **BR-01** — 1 day, closes the Tier E gap, raises confidence in non-Dev environments.
-3. **BR-02** — 1 day per non-PG engine, but the project README still says "PostgreSQL only" in the eval scope, so timing depends on when multi-DB becomes a real goal.
+1. **BR-01** — 1 day, closes the Tier E gap, raises confidence in non-Dev environments.
+2. **BR-02** — 1 day per non-PG engine, but the project README still says "PostgreSQL only" in the eval scope, so timing depends on when multi-DB becomes a real goal.
+
+> **BR-15** was closed: assertions S09 and S10 in `test_05_schema_and_business_rules.sql` now verify `pg_roles.rolconnlimit` matches the env's `conn_limit` for the app role.
 
 ---
 
@@ -133,49 +134,19 @@ Recommended remediation priority across the 3 actionable gaps (excluding the 2 d
 
 ---
 
-## Gap 3 — BR-15 (❌ Not verified)
+## Gap 3 — BR-15 (Closed)
 
 ### Requirement
 
 > Each environment shall enforce a **connection limit** appropriate to its workload: Dev=10, Test=15, Staging=20, Prod=50.
 
-### What's already verified
+### Resolution
 
-- The `\set conn_limit` value is set per env in the respective `build/environments/env_<env>.sql` files.
+**Closed.** Assertions S09 and S10 in `tests/suites/test_05_schema_and_business_rules.sql` now:
+- S09: verify the app role exists in `pg_roles`
+- S10: verify `pg_roles.rolconnlimit` matches the env's configured `conn_limit`
 
-### What's NOT verified
-
-- **No test confirms PostgreSQL actually applies the configured connection limit to the role.** A typo in `env_prod.sql` setting `conn_limit` to `5` instead of `50` would pass all current tests.
-
-### Risk if unaddressed
-
-| Scenario | Likelihood | Impact |
-|----------|-----------|--------|
-| Production rolconnlimit is silently wrong; users hit unexpected `too many connections` errors | Low-Medium | High — production incident, slow to diagnose |
-
-### Recommended verification
-
-**Method:** Test (T). Add 4 assertions to `tests/suites/test_05_schema_and_business_rules.sql` — one per environment.
-
-```sql
--- Conceptual SQL (each env asserts its own expected value)
-PERFORM :"schema_name".assert_equals(
-    'schema_business_rules',
-    'conn_limit_dev',
-    10::int,
-    (SELECT rolconnlimit FROM pg_roles WHERE rolname = :'app_user')
-);
-```
-
-Since the SQL test suite is invoked once per environment by `tests/run_tests.sh`, each invocation will pick up the env-specific `:'app_user'` and `conn_limit` via `\set`.
-
-**Even cheaper alternative** — verify once via Tier I extension: in `_run_deploy_dev_twice` (or a new sibling), after the second deploy, query `pg_roles` and assert `rolconnlimit = 10` for `te_dev_user`.
-
-### Effort & priority
-
-| Effort | Priority | Owner |
-|--------|----------|-------|
-| **~1 hour** | **High** — cheapest gap to close. No dependencies. Catches a real production failure mode. | Anyone |
+The plumbing: `run_tests.sh` passes `--set conn_limit=N` → `run_all_tests.sql` forwards it via `set_config('te.conn_limit', ...)` → the DO block reads it and asserts against the live `pg_roles` value.
 
 ---
 

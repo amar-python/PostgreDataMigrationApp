@@ -18,46 +18,24 @@ claim below was reproduced, not inferred from reading code.
 
 | ID | Gap | Severity | Decision needed |
 |---|---|---|---|
-| G1 | `config.env.example` names do not match `setup.sh` / loaders | **High** | Yes — which side renames |
+| G1 | ~~`config.env.example` names do not match `setup.sh` / loaders~~ | **Closed** | Renamed to `PG_*_<ENV>` scheme |
 | G2 | Windows CI cannot run database-backed tests | Medium | Yes — accept scope, or start PG on the runner |
 | G3 | Tiers X and E remain unimplemented | Medium | No — deferred by design |
-| G4 | Runtime artifacts are not gitignored | Low | No |
+| G4 | ~~Runtime artifacts are not gitignored~~ | **Closed** | Added to `.gitignore` |
 | G5 | `VCRM.md` BR-20 assertion count edited | Low | Yes — confirm or revert |
 
 ---
 
-### G1 — `config.env.example` variable names (High)
+### G1 — `config.env.example` variable names (Closed)
 
-#### Reproduction
+**Resolution:** Renamed all variables in `config.env.example` to the
+`PG_*_<ENV>` scheme (`PG_DB_DEV`, `PG_SCHEMA_DEV`, `PG_SUPERUSER`,
+`PG_SUPERUSER_PASSWORD`, etc.) — matching what `loader_postgresql.sh`,
+`csv_utilise.sh`, and `setup.sh`'s output all expect.
 
-```text
-$ cp build/config.env.example build/config.local.env
-$ bash build/csv_loader.sh data.csv --engine postgresql --env dev
-build/csv/loader_postgresql.sh: line 33: PG_DB_DEV: unbound variable
-
-```
-
-#### Detail
-
-| Consumer | Expects | `config.env.example` provides |
-|---|---|---|
-| `build/csv/loader_postgresql.sh` | `PG_DB_DEV`, `PG_SCHEMA_DEV` | `DEV_DB_NAME`, `DEV_SCHEMA` |
-| `build/setup.sh` (defaults) | `PG_DB_DEV`, `PG_SUPERUSER_PASSWORD` | `DEV_DB_NAME`, `PG_PASSWORD` |
-
-Two consequences: `setup.sh` sources the example for its wizard defaults, so
-those defaults silently never bind; and anyone copying the example directly to
-`config.local.env` gets a 100% CSV load-failure rate.
-
-#### Options
-
-1. Rename in `config.env.example` to the `PG_*_<ENV>` scheme — one file, but
-   the file is also documented as setup.sh's input.
-2. Teach `setup.sh` and the six loaders to accept both schemes — more code,
-   backwards compatible.
-3. Keep the two schemes and document the boundary explicitly.
-
-**Current state:** worked around. `scripts/provision_full_test_env.sh` writes
-the `PG_*_<ENV>` names, so provisioned runs succeed.
+Copying the example directly to `config.local.env` now produces a working
+configuration. The `provision_full_test_env.sh` workaround is still valid but
+no longer required for basic operation.
 
 ### G2 — Windows CI cannot host PostgreSQL (Medium)
 
@@ -85,27 +63,10 @@ Redis and Teradata rest on code review rather than execution.
 Partially mitigated: `tests/test_parity.py::TestAllEnvironmentsHaveRequiredTables`
 now runs against all four PostgreSQL environments.
 
-### G4 — Runtime artifacts not gitignored (Low)
+### G4 — Runtime artifacts not gitignored (Closed)
 
-These appear as untracked after a normal run and risk being committed by a
-careless `git add -A`:
-
-```text
-tests/snapshots/all_valid_expected_valid.csv
-infra/terraform-prod/tfplan
-infra/terraform/terraform-provider-debug-after-refresh.log
-
-```
-
-**Suggested `.gitignore` additions**
-
-```text
-tests/snapshots/
-tfplan
-*.tfplan
-terraform-provider-*.log
-
-```
+**Resolution:** All four suggested entries were added to `.gitignore`:
+`tests/snapshots/`, `tfplan`, `*.tfplan`, `terraform-provider-*.log`.
 
 ### G5 — `VCRM.md` BR-20 edited (Low)
 
