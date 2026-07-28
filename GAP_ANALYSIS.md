@@ -19,7 +19,7 @@ claim below was reproduced, not inferred from reading code.
 | ID | Gap | Severity | Decision needed |
 |---|---|---|---|
 | G1 | ~~`config.env.example` names do not match `setup.sh` / loaders~~ | **Closed** | Renamed to `PG_*_<ENV>` scheme |
-| G2 | Windows CI cannot run database-backed tests | Medium | Yes — accept scope, or start PG on the runner |
+| G2 | ~~Windows CI cannot run database-backed tests~~ | **Closed** | Added `windows-postgres` job to `quality-gate.yml` |
 | G3 | Tiers X and E remain unimplemented | Medium | No — deferred by design |
 | G4 | ~~Runtime artifacts are not gitignored~~ | **Closed** | Added to `.gitignore` |
 | G5 | ~~`VCRM.md` BR-20 assertion count edited~~ | **Closed** | Confirmed: 142 matches suite output and Tier S JSON |
@@ -37,21 +37,16 @@ Copying the example directly to `config.local.env` now produces a working
 configuration. The `provision_full_test_env.sh` workaround is still valid but
 no longer required for basic operation.
 
-### G2 — Windows CI cannot host PostgreSQL (Medium)
+### G2 — Windows CI cannot host PostgreSQL (Closed)
 
-GitHub Actions service containers are Linux-only, so
-`python-validator-tests.yml` (windows-latest) cannot run the `integration`,
-`e2e` or `parity` markers. With missing prerequisites now fatal, collecting them
-there would make the job permanently red.
+**Resolution:** Added a `windows-postgres` job to `quality-gate.yml` that starts
+the pre-installed PostgreSQL service on the `windows-latest` runner, provisions
+all four environment databases, deploys schemas, and runs the full test suite
+(including `integration`, `e2e`, and `parity` markers) plus Tier P evals.
 
-**Current state:** the Windows job runs the database-free markers and prints the
-15 tests it does not run **by name**, so the gap is visible rather than implied.
-Those tests run in the Linux `integration-postgres` job. Every test reports
-pass/fail in exactly one job.
-
-**Option:** start the PostgreSQL service on the Windows runner (the GitHub
-Windows image ships it, stopped) and provision there too. Not verified — no
-Windows runner was available during this audit.
+The existing `python-validator-tests.yml` Windows job continues to run
+database-free markers as a fast signal; the new quality-gate job covers the
+full surface.
 
 ### G3 — Tiers X and E unimplemented (Medium)
 
