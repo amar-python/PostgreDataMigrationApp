@@ -623,7 +623,7 @@ def _round_trip_one_csv(
             if col in ("_csv_row_id", "_loaded_at"):
                 marker_indices.add(i)
             else:
-                data_indices.add(i)
+                data_indices.append(i)
 
         exported_data_header = [exported_header[i] for i in data_indices]
         if exported_data_header != orig_col_names:
