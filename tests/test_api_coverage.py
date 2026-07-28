@@ -174,7 +174,7 @@ class PreviewTeTableMatch(_IntegrationBase):
     """POST /api/csv/preview must populate teTableMatch when columns fit."""
 
     def test_preview_returns_te_match_for_matching_columns(self):
-        csv = f"name,org_type,country\n{self.tag},Government,AU\n"
+        csv = f"name,org_type,country\n{self.tag},government,AU\n"
         r = self.client.post("/api/csv/preview",
                              json={"fileName": f"{self.tag}.csv", "content": csv})
         self.assertEqual(r.status_code, 200)
@@ -234,7 +234,7 @@ class DeleteEndpoint(_IntegrationBase):
                          "table should be unregistered after delete")
 
     def test_delete_te_only_removes_registry(self):
-        csv = f"name,org_type,country\n{self.tag}_del,Government,AU\n"
+        csv = f"name,org_type,country\n{self.tag}_del,government,AU\n"
         up = self._upload_te(csv)
         body = up.json()
         self.assertEqual(body["status"], "ok", body)
