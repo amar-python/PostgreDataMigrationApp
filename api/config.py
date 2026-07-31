@@ -23,6 +23,12 @@ class Settings:
 
     MAX_UPLOAD_BYTES: int = int(os.environ.get("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 
+    # Gate for the DELETE /api/csv/files/{id} endpoint.
+    # Set API_ALLOW_DESTRUCTIVE=false in shared/prod to prevent accidental table drops.
+    allow_destructive: bool = os.environ.get("API_ALLOW_DESTRUCTIVE", "true").lower() in (
+        "1", "true", "yes"
+    )
+
 
 settings = Settings()
 
@@ -41,3 +47,4 @@ TE_TABLES = [
     "defect_reports",
     "evidence_artifacts",
 ]
+

@@ -111,29 +111,54 @@ def table_rows(table_name: str, limit: int = 50) -> dict:
 
 @router.delete("/files/{file_id}")
 def delete_file(file_id: int) -> dict:
+    if not settings.allow_destructive:
+        raise HTTPException(
+            403,
+            "Destructive operations are disabled. "
+            "Set API_ALLOW_DESTRUCTIVE=true to enable DELETE.",
+        )
     with Conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 sql.SQL(
-                    "SELECT table_name, mode FROM {}.csv_files WHERE id = %s"
+                    "SELECT table_name, mode, file_name FROM {}.csv_files WHERE id = %s"
                 ).format(sql.Identifier(settings.UPLOADS_SCHEMA)),
                 (file_id,),
             )
             row = cur.fetchone()
             if row is None:
                 raise HTTPException(404, "File not found")
-            table_name, mode = row
+            table_name, mode, file_name = row
             if mode == "dynamic":
+                # Schema whitelist: only drop tables that live in the uploads schema.
                 cur.execute(
-                    sql.SQL("DROP TABLE IF EXISTS {}.{}").format(
-                        sql.Identifier(settings.UPLOADS_SCHEMA), sql.Identifier(table_name)
-                    )
+                    """
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = %s AND table_name = %s
+                    """,
+                    (settings.UPLOADS_SCHEMA, table_name),
                 )
+                if cur.fetchone() is not None:
+                    cur.execute(
+                        sql.SQL("DROP TABLE IF EXISTS {}.{}").format(
+                            sql.Identifier(settings.UPLOADS_SCHEMA),
+                            sql.Identifier(table_name),
+                        )
+                    )
             cur.execute(
                 sql.SQL("DELETE FROM {}.csv_files WHERE id = %s").format(
                     sql.Identifier(settings.UPLOADS_SCHEMA)
                 ),
                 (file_id,),
             )
-        conn.commit()
-    return {"status": "ok", "deleted": file_id}
+            # Persist audit record so deletions are traceable after the table is gone.
+            cur.execute(
+                sql.SQL(
+                    "INSERT INTO {}.audit_log "
+                    "(action, file_id, file_name, table_name, mode) "
+                    "VALUES ('delete', %s, %s, %s, %s)"
+                ).format(sql.Identifier(settings.UPLOADS_SCHEMA)),
+                (file_id, file_name, table_name, mode),
+            )
+            conn.commit()
+            return {"status": "ok", "deleted": file_id}
