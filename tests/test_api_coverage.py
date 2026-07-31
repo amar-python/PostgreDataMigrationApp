@@ -320,7 +320,10 @@ class TeUploadPipeline(_IntegrationBase):
         r = self._upload_te(csv)
         body = r.json()
         self.assertEqual(body["status"], "ok", body)
-        self.assertGreaterEqual(body["insertedRows"], 1)
+        self.assertGreaterEqual(
+            body["insertedRows"], 1,
+            f"failedRows={body.get('failedRows')}, "
+            f"rowErrors={body.get('rowErrors')}")
         self.assertIn("organisations", body["tableName"])
 
     def test_response_shape_matches_contract(self):
