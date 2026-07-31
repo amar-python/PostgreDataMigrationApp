@@ -1,11 +1,10 @@
 """PostgreDataMigrationApp API — FastAPI backend for the CSV migration frontend.
 
-Run (from the api/ directory):
-    pip install -r requirements.txt
-    set PGPASSWORD=<pw>       # or export on Mac/Linux
-    uvicorn main:app --reload --port 8000
-
-Interactive docs: http://localhost:8000/docs
+Run (from the repo root):
+    pip install -r api/requirements.txt
+    set PGPASSWORD=  # or $env:PGPASSWORD="" on PowerShell
+    python -m uvicorn api.main:app --reload --port 8000
+    Interactive docs: http://localhost:8000/docs
 """
 
 from contextlib import asynccontextmanager
