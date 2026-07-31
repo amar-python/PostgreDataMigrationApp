@@ -226,13 +226,13 @@ jobs:
           }
 
           # Set password and switch to md5 auth
-          & "$binDir\psql" -U postgres -d postgres -p 5432 -c "ALTER USER postgres PASSWORD 'postgres';"
+          & "$binDir\psql" -U postgres -p 5432 -c "ALTER USER postgres PASSWORD 'postgres';"
           $hbaPath = Join-Path $dataDir "pg_hba.conf"
           (Get-Content $hbaPath) -replace 'trust$','md5' | Set-Content $hbaPath
           & "$binDir\pg_ctl" -D $dataDir reload
           Start-Sleep -Seconds 2
 
-          & "$binDir\psql" -U postgres -d postgres -p 5432 -c "SELECT version();"
+          & "$binDir\psql" -U postgres -p 5432 -c "SELECT version();"
 
       - name: Write CI database config
         shell: pwsh
