@@ -79,17 +79,27 @@ def pool_exhausted_handler(request: Request, exc: psycopg2.pool.PoolError) -> JS
 
 @app.get("/api/health", tags=["health"])
 def health() -> dict:
+    # BUG-031: verify the uploads schema is present, not just that Postgres is
+    # up. Otherwise a half-bootstrapped API reports "ok" and then every /upload
+    # call throws UndefinedTable.
+    from psycopg2 import sql as _sql
     try:
         with db.Conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT version()")
                 pg_version = cur.fetchone()[0]
+                cur.execute(
+                    _sql.SQL("SELECT 1 FROM {}.csv_files LIMIT 0").format(
+                        _sql.Identifier(settings.UPLOADS_SCHEMA)
+                    )
+                )
         return {
             "status": "ok",
             "database": settings.PG_DATABASE,
             "host": f"{settings.PG_HOST}:{settings.PG_PORT}",
             "postgres": pg_version.split(" on ")[0],
+            "uploads_schema": settings.UPLOADS_SCHEMA,
         }
     except Exception as exc:  # noqa: BLE001 — surface DB reachability to the UI
         logger.warning("Health check failed: %s", exc)
-        return {"status": "degraded", "error": "database unreachable"}
+        return {"status": "degraded", "error": str(exc).split("\n")[0][:200]}

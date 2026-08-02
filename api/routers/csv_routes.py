@@ -33,10 +33,23 @@ class UploadRequest(BaseModel):
 def preview(req: PreviewRequest) -> dict:
     if len(req.content) > settings.MAX_UPLOAD_BYTES:
         raise HTTPException(413, "File too large")
-    result = build_preview(req.content)
+    # BUG-025: mirror the try/except contract that /upload has. An unexpected
+    # parse error (regex catastrophic backtracking, memory error, etc.) must
+    # not surface as a raw 500 to the frontend.
+    try:
+        result = build_preview(req.content)
+    except Exception as exc:  # noqa: BLE001 — surface any parser failure as structured JSON
+        return {
+            "status": "invalid_structure",
+            "reason": "parse_failed",
+            "message": f"The CSV couldn't be parsed: {str(exc)[:200]}",
+        }
     if result.get("status") == "ok":
         # Suggest a T&E table if the columns fit one (drives the mode picker in the UI)
-        result["teTableMatch"] = match_te_table(result["columns"])
+        try:
+            result["teTableMatch"] = match_te_table(result["columns"])
+        except Exception:  # noqa: BLE001 — T&E match is best-effort, never block the preview
+            result["teTableMatch"] = None
     return result
 
 
