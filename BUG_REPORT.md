@@ -1098,7 +1098,7 @@ If it raises, return `{"status":"degraded","error":"uploads schema missing"}`.
 ## BUG-032 — No migration story for `csv_uploads.csv_files`
 
 **Severity:** low (bites the first schema evolution, not today)
-**Status:** OPEN
+**Status:** RESOLVED 2026-08-02
 **File:** `api/db.py` `bootstrap()`
 
 `bootstrap()` uses `CREATE TABLE IF NOT EXISTS`, which is idempotent for the initial deploy but does nothing when the table already exists. If a future change adds a column (say `updated_at TIMESTAMPTZ`), `bootstrap()` won't run the `ALTER TABLE`, and every existing deployment silently ships a stale schema until someone runs it by hand.
@@ -1112,9 +1112,23 @@ If it raises, return `{"status":"degraded","error":"uploads schema missing"}`.
 
 **Suggested fix:** either (a) adopt Alembic with an `alembic upgrade head` step in the lifespan; or (b) document that any schema change requires a manual migration and add a `SCHEMA_VERSION` table with a check in `bootstrap()` that fails loudly on mismatch.
 
-**Actions taken for resolution:** _(fill in when RESOLVED)_
+**Actions taken for resolution:**
 
-**Resolution:** _(fill in when RESOLVED — commit hash + one line)_
+Chose option (a) — Alembic + auto-run on API startup — based on the user's stated need for ~3 deployment environments over the next year.
+
+1. Added `alembic>=1.13.0` to `api/requirements.txt` (pulls in SQLAlchemy transitively — used only for the migration connection, not for ORM models).
+2. Created `alembic.ini` at the repo root with a placeholder `sqlalchemy.url` (real URL is built at runtime by `env.py` from `api.config.settings`, so the same libpq env vars the API uses drive migrations too).
+3. Created `alembic/env.py`: reads `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE` from `api.config.settings`, builds a SQLAlchemy URL, opens a NullPool connection for the migration run. Both online and offline (`--sql`) migration paths implemented.
+4. Created `alembic/script.py.mako` — standard Alembic template for new revisions.
+5. Wrote `alembic/versions/0001_initial_uploads_schema.py` — a baseline migration whose `upgrade()` mirrors the previous `bootstrap()` DDL 1:1 using `IF NOT EXISTS` clauses. This means a database that was already bootstrapped by the pre-Alembic code path upgrades to head as a no-op — no manual `alembic stamp head` needed.
+6. Rewrote `api/db.py:bootstrap()` — replaced the four hand-written `CREATE TABLE IF NOT EXISTS` calls with `alembic.command.upgrade(cfg, "head")`. Alembic imports are deferred inside the function so `pytest` collection of the `api` package doesn't drag in SQLAlchemy unless bootstrap actually runs.
+7. Documented the migration workflow in `API_INTEGRATION.md` (new `## Migrations` section): how new migrations get scaffolded, when they run, and the "schema name is fixed" limitation (Alembic migrations are static — changing `CSV_UPLOADS_SCHEMA` env var isn't supported without a rename migration).
+
+**Known limitations, deferred:**
+- Concurrent multi-instance startup can race the `alembic upgrade head` call. Fine for single-container-per-env deployments; adopt `advisory_lock` if you ever run multi-replica.
+- The initial migration uses `IF NOT EXISTS` everywhere for compatibility with pre-Alembic databases; future migrations should NOT rely on that pattern — Alembic tracks state properly.
+
+**Resolution 2026-08-02:** in-lifespan `alembic upgrade head` replaces the hand-written DDL. Schema evolution is now first-class.
 
 ---
 
@@ -1210,7 +1224,7 @@ _Rows are never deleted. When a bug is RESOLVED, update its Status column — do
 | BUG-029 | medium | RESOLVED 2026-08-02 | frontend/src/lib/lovable-error-reporting.ts (third-party phone-home) |
 | BUG-030 | low | OPEN | api/db.py (SimpleConnectionPool.getconn has no timeout) |
 | BUG-031 | low | RESOLVED 2026-08-02 | api/main.py (/api/health doesn't probe uploads schema) |
-| BUG-032 | low | OPEN | api/db.py (no migration story for csv_files) |
+| BUG-032 | low | RESOLVED 2026-08-02 | api/db.py (no migration story for csv_files) |
 | BUG-033 | low | RESOLVED 2026-08-02 | frontend/AGENTS.md (orphaned lovable scaffolding) |
 | BUG-034 | low | OPEN | tests/test_api*.py (possible overlap) |
 

@@ -165,6 +165,61 @@ these were written.
 
 ---
 
+## Migrations
+
+Schema changes to `csv_uploads.*` are managed by Alembic. Migrations run
+automatically at API startup (see `bootstrap()` in `api/db.py`) via
+`alembic upgrade head` against the same database the API pool connects to.
+
+**Layout:**
+
+    alembic.ini                                      — Alembic config
+    alembic/env.py                                   — Runtime config (reads api.config.settings)
+    alembic/script.py.mako                           — Template for new revisions
+    alembic/versions/0001_initial_uploads_schema.py  — Baseline (csv_files + audit_log + indexes)
+
+**Adding a new migration:**
+
+```bash
+# Same env vars scripts/start-api.ps1 uses (PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE):
+python -m alembic revision -m "add updated_at to csv_files"
+# Edit the generated alembic/versions/000N_add_updated_at_to_csv_files.py
+# — write raw SQL in upgrade() and downgrade() via op.execute("ALTER TABLE ...").
+# Alembic does NOT autogenerate for this project; there are no SQLAlchemy models.
+python -m alembic upgrade head    # apply locally
+```
+
+Restart the API and every environment gets the new migration on next boot.
+
+**Preview SQL without applying** (useful for review/PR):
+
+```bash
+python -m alembic upgrade head --sql > pending.sql
+```
+
+**Rollback the most recent migration:**
+
+```bash
+python -m alembic downgrade -1
+```
+
+**Limitations:**
+
+- Migration files hard-code the schema name `csv_uploads`. Changing the
+  `CSV_UPLOADS_SCHEMA` env var at runtime affects `api/` code but NOT
+  Alembic's target schema. If you need a different schema name, write a
+  rename migration.
+- Startup migration is not multi-instance-safe — two API instances booting
+  simultaneously can race the `alembic upgrade head` call. Fine for a single
+  container per environment; adopt `pg_advisory_lock` if you scale out.
+- The baseline migration (`0001_initial_uploads_schema.py`) uses
+  `IF NOT EXISTS` clauses so it applies cleanly to databases that were
+  bootstrapped by the pre-Alembic code path. Future migrations should NOT
+  rely on that pattern — Alembic tracks state via the `alembic_version`
+  table it creates automatically.
+
+---
+
 ## Tests
 
 `tests/test_api.py` provides 19 tests:

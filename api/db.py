@@ -1,10 +1,14 @@
-"""Connection pool + one-time schema bootstrap for the uploads registry."""
+"""Connection pool + Alembic-driven schema bootstrap for the uploads registry."""
+
+import logging
+from pathlib import Path
 
 import psycopg2
 import psycopg2.pool
-from psycopg2 import sql
 
 from api.config import settings
+
+logger = logging.getLogger(__name__)
 
 _pool: psycopg2.pool.SimpleConnectionPool | None = None
 
@@ -46,55 +50,34 @@ class Conn:
 
 
 def bootstrap() -> None:
-    """Create the uploads schema + registry table if missing. Idempotent."""
-    with Conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(
-                    sql.Identifier(settings.UPLOADS_SCHEMA)
-                )
-            )
-            cur.execute(
-                sql.SQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS {}.csv_files (
-                        id           BIGSERIAL PRIMARY KEY,
-                        file_name    TEXT NOT NULL,
-                        file_hash    TEXT NOT NULL,
-                        table_name   TEXT NOT NULL,
-                        mode         TEXT NOT NULL DEFAULT 'dynamic',
-                        row_count    BIGINT NOT NULL DEFAULT 0,
-                        column_names TEXT[] NOT NULL DEFAULT '{{}}',
-                        created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-                    )
-                    """
-                ).format(sql.Identifier(settings.UPLOADS_SCHEMA))
-            )
-            cur.execute(
-                sql.SQL(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS csv_files_name_uq ON {}.csv_files (file_name)"
-                ).format(sql.Identifier(settings.UPLOADS_SCHEMA))
-            )
-            cur.execute(
-                sql.SQL(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS csv_files_hash_uq ON {}.csv_files (file_hash)"
-                ).format(sql.Identifier(settings.UPLOADS_SCHEMA))
-            )
-            # Audit log: persistent record of every destructive operation.
-            cur.execute(
-                sql.SQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS {}.audit_log (
-                        id BIGSERIAL PRIMARY KEY,
-                        action TEXT NOT NULL,
-                        file_id BIGINT,
-                        file_name TEXT,
-                        table_name TEXT,
-                        mode TEXT,
-                        performed_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                    )
-                    """
-                ).format(sql.Identifier(settings.UPLOADS_SCHEMA))
-            )
-        conn.commit()
+    """Bring the uploads schema to head via Alembic.
 
+    BUG-032: previously this function ran hand-written CREATE TABLE IF NOT EXISTS
+    statements. That was idempotent for the initial deploy but did nothing on
+    schema evolution — an ALTER TABLE added in a later release wouldn't ever
+    run on an existing deployment.
+
+    Now this function invokes `alembic upgrade head` in-process against the
+    same database the API pool is configured for (see alembic/env.py, which
+    reads the same api.config.settings values). Every startup checks the
+    current schema version and applies any pending migrations transactionally.
+
+    Idempotent: if the DB is already at head, this is a no-op that costs one
+    `SELECT version_num FROM alembic_version` query.
+
+    Safe to call after init_pool() — Alembic opens its own SQLAlchemy engine
+    with a NullPool and doesn't share connections with the API pool.
+    """
+    # Deferred imports so pytest collection of api/ doesn't pull in Alembic
+    # unless bootstrap() is actually called (e.g. in the lifespan handler,
+    # which is only invoked by tests using TestClient as a context manager).
+    from alembic import command
+    from alembic.config import Config
+
+    repo_root = Path(__file__).resolve().parent.parent
+    cfg = Config(str(repo_root / "alembic.ini"))
+    logger.info("Running alembic upgrade head against %s@%s:%s/%s",
+                settings.PG_USER, settings.PG_HOST, settings.PG_PORT,
+                settings.PG_DATABASE)
+    command.upgrade(cfg, "head")
+    logger.info("Alembic migrations complete")
