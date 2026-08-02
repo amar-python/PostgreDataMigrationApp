@@ -20,6 +20,7 @@ Install:
 - **Git** (on Windows: [Git for Windows](https://gitforwindows.org/), which includes Git Bash)
 - **Python 3.10+**
 - **PostgreSQL 13+** — server running, `psql` client on PATH
+- **Node.js 20+** — only required if you plan to run the Web UI in `frontend/` (Phase 7 below)
 
 **▶ RUN IN: Git Bash** — verify:
 
@@ -106,6 +107,68 @@ bash build/csv_utilise.sh export <table> out.csv          # round-trip back to C
 bash build/csv_utilise.sh drop <table> --yes              # remove a CSV-loaded table
 ```
 
+## Phase 7 — (Optional) Start the Web UI + REST API
+
+The `api/` (FastAPI) and `frontend/` (React 19 + TanStack Start) folders add a browser UI for CSV upload/preview backed by a REST API. **The browser never talks to Postgres directly** — every read/write goes through `api/`.
+
+Two terminals, both Windows-first PowerShell today.
+
+### One-time install
+
+**▶ RUN IN: PowerShell** (repo root):
+
+```powershell
+pip install -r api\requirements.txt      # fastapi, uvicorn, psycopg2-binary, pydantic
+cd frontend
+npm install                              # or let start-frontend.ps1 do it on first launch
+cd ..
+```
+
+### Configure connection defaults
+
+The API defaults target the **local PG 18 dev instance on port 5433** with database `te_mgmt_dev` and schema `te_dev`. Override any of these before launching:
+
+| Env var | Default | Notes |
+|---|---|---|
+| `PGHOST` / `PGPORT` / `PGUSER` / `PGDATABASE` | `localhost` / `5433` / `postgres` / `te_mgmt_dev` | Standard libpq |
+| `PGPASSWORD` | *(prompt)* | `start-api.ps1` prompts securely if unset |
+| `API_KEY` | *(empty)* | If unset, endpoints are unauthenticated (fine for localhost) |
+| `CSV_UPLOADS_SCHEMA` / `TE_SCHEMA` | `csv_uploads` / `te_dev` | Where dynamic uploads and fixed T&E tables live |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Must include the frontend origin |
+
+The frontend reads (from `frontend/.env`):
+
+| Env var | Default | Notes |
+|---|---|---|
+| `VITE_API_URL` | `http://localhost:8000` | FastAPI base URL |
+| `VITE_API_KEY` | *(empty)* | Sent as `X-API-Key` header when non-empty |
+
+### Run — two terminals
+
+**▶ Terminal 1 — RUN IN: PowerShell** (repo root):
+
+```powershell
+.\scripts\start-api.ps1
+# → http://localhost:8000/docs (interactive Swagger UI)
+# → http://localhost:8000/api/health (should return {"status": "ok", ...})
+```
+
+**▶ Terminal 2 — RUN IN: PowerShell** (repo root):
+
+```powershell
+.\scripts\start-frontend.ps1
+# → http://localhost:5173/
+```
+
+### Smoke test
+
+1. Open <http://localhost:5173/> — the CSV Migrator page loads.
+2. Drag a CSV onto the drop zone → preview shows inferred types → click Upload.
+3. In Terminal 1 you should see `POST /api/csv/preview 200` then `POST /api/csv/upload 200`.
+4. The file appears in the list below; clicking it fetches rows via `GET /api/csv/tables/{name}/rows`.
+
+If the browser shows "This page didn't load", open DevTools (F12) → Console tab and check for a red stack trace — the API terminal will show the failing request path.
+
 ---
 
 ## Troubleshooting order
@@ -117,3 +180,10 @@ When a DB-dependent step fails, check in this order — it resolves most setup i
 3. Does `build/config.local.env` exist? (Phase 3 creates it; a fresh clone does not have it)
 4. Are you in the right terminal? `.sh` scripts require Git Bash / WSL2 — they fail in
    PowerShell and cmd with syntax errors.
+
+### Phase 7 (Web UI + API) specifics
+
+5. **API terminal shows `connection refused` / `password authentication failed`** — the API defaults to `PGPORT=5433` (local PG 18), not the default 5432. Verify PG 18 is running and the password matches by running `psql -h localhost -p 5433 -U postgres -c "SELECT version();"`.
+6. **Browser shows a CORS error in DevTools Console** — the frontend origin is not in `CORS_ORIGINS`. The default allows `http://localhost:5173` and `http://localhost:3000`; if Vite grabbed a different port, set `$env:CORS_ORIGINS="http://localhost:<port>"` before launching `start-api.ps1`.
+7. **Browser shows "This page didn't load"** — an SSR crash. Open DevTools (F12) → Console for the client trace, and check the frontend terminal for the server trace. The most common cause is the API being unreachable on `VITE_API_URL`.
+8. **`start-frontend.ps1` fails with `Missing closing '}' in statement block`** — an em-dash (`—`) character in the script confuses Windows PowerShell 5.1. Re-save the script as UTF-8 with BOM, or replace em-dashes with plain ASCII hyphens.

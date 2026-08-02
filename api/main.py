@@ -7,18 +7,45 @@ Run (from the repo root):
     Interactive docs: http://localhost:8000/docs
 """
 
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import psycopg2.pool
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from api import db
+from api.auth import require_api_key
 from api.config import settings
 from api.routers import csv_routes, te_routes
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not settings.API_KEY:
+        logger.warning(
+            "API_KEY is not set - every endpoint is unauthenticated. "
+            "Set the API_KEY environment variable before deploying anywhere "
+            "reachable beyond localhost."
+        )
+    else:
+        # Fingerprint (first 4 chars + length) so mismatches with the frontend's
+        # VITE_API_KEY are diagnosable without leaking the secret to the log.
+        # Fixes BUG-006 in BUG_REPORT.md.
+        fp = settings.API_KEY[:4] + "..." if len(settings.API_KEY) >= 4 else "***"
+        logger.info(
+            "API_KEY is set (fingerprint: %s, length: %d). "
+            "Frontend must send matching VITE_API_KEY via the X-API-Key header.",
+            fp, len(settings.API_KEY),
+        )
+    if not settings.PG_PASSWORD:
+        logger.warning(
+            "PGPASSWORD is not set - connecting with an empty password. "
+            "Fine for local dev; set PGPASSWORD before deploying anywhere else."
+        )
     db.init_pool()
     db.bootstrap()
     yield
@@ -30,17 +57,24 @@ app = FastAPI(
     version="1.0.0",
     description="CSV migration pipeline: preview, validate, load (dynamic tables or fixed T&E schema).",
     lifespan=lifespan,
+    dependencies=[Depends(require_api_key)],
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
 
 app.include_router(csv_routes.router)
 app.include_router(te_routes.router)
+
+
+@app.exception_handler(psycopg2.pool.PoolError)
+def pool_exhausted_handler(request: Request, exc: psycopg2.pool.PoolError) -> JSONResponse:
+    logger.warning("DB connection pool exhausted: %s", exc)
+    return JSONResponse(status_code=503, content={"detail": "Server busy, please retry shortly."})
 
 
 @app.get("/api/health", tags=["health"])
@@ -57,4 +91,5 @@ def health() -> dict:
             "postgres": pg_version.split(" on ")[0],
         }
     except Exception as exc:  # noqa: BLE001 — surface DB reachability to the UI
-        return {"status": "degraded", "error": str(exc)}
+        logger.warning("Health check failed: %s", exc)
+        return {"status": "degraded", "error": "database unreachable"}

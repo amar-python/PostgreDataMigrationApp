@@ -29,6 +29,11 @@ class Settings:
         "1", "true", "yes"
     )
 
+    # Shared secret required on every request via the X-API-Key header.
+    # Empty in local dev by default; set API_KEY before deploying anywhere reachable
+    # beyond localhost.
+    API_KEY: str = os.environ.get("API_KEY", "")
+
 
 settings = Settings()
 

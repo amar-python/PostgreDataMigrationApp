@@ -1,24 +1,33 @@
 # Frontend Integration — CSV Table Hub
 
-Notes on the FastAPI backend in `api/`, which connects the **CSV Table Hub**
-frontend to PostgreSQL.
+Notes on the FastAPI backend in `api/`, which connects the React frontend in
+`frontend/` (originally the standalone **csv-table-hub-main** project, now
+merged into this monorepo) to PostgreSQL.
+
+> **See also** the **Web UI + REST API** section of `README.md` for the
+> user-facing quickstart (two-terminal launch, endpoint table, env vars). This
+> file is the deeper design/integration doc — for how the backend is put
+> together and what's still open.
 
 ---
 
 ## Architecture
 
 ```text
-CSV Table Hub (React)  →  api/ (FastAPI)  →  PostgreSQL
-                                          ├── uploads schema   (dynamic mode)
-                                          └── te_<env> schema  (te mode)
+frontend/ (React 19 + TanStack Start)  →  api/ (FastAPI)  →  PostgreSQL
+                                                          ├── csv_uploads schema  (dynamic mode)
+                                                          └── te_<env>    schema  (te mode)
 ```
+
+Schema names are configurable via `CSV_UPLOADS_SCHEMA` (default `csv_uploads`)
+and `TE_SCHEMA` (default `te_dev`) — see `api/config.py`.
 
 Two upload modes:
 
 | Mode | Destination | Behaviour |
 |---|---|---|
-| `dynamic` | `uploads.csv_<sha256[:16]>` | A typed table per CSV, columns derived from the header |
-| `te` | Fixed T&E schema | Loads into one of the 12 core tables when the columns match |
+| `dynamic` | `csv_uploads.csv_<sha256[:16]>` | A typed table per CSV, columns derived from the header |
+| `te` | Fixed T&E schema (`te_dev.*`) | Loads into one of the 12 core tables when the columns match |
 
 `services/te_loader.match_te_table()` inspects the parsed columns and suggests a
 T&E table, which drives the mode picker in the UI.
@@ -36,12 +45,25 @@ T&E table, which drives the mode picker in the UI.
 
 CSV content is sent as a JSON string, not multipart.
 
+## Authentication
+
+Every endpoint (including `/api/health`) requires an `X-API-Key` header
+matching the `API_KEY` environment variable. If `API_KEY` is unset the check
+is skipped — that's the local-dev default, and `api/main.py` logs a warning
+at startup when it's unset so this isn't silently forgotten in a real
+deployment. Set `API_KEY` (backend) and `VITE_API_KEY` (frontend, same value)
+before deploying anywhere reachable beyond localhost. See `frontend/.env`.
+
+> **Known DX gap** — if `API_KEY` and `VITE_API_KEY` don't match, every request
+> returns 401 with no hint from either process. Tracked as BUG-006 in
+> `BUG_REPORT.md`.
+
 ## What it does well
 
 * **Deduplication at three levels** — filename, whole-file content hash, and
   per-row `_row_hash` with `ON CONFLICT DO NOTHING`. This is what the
   frontend's "no duplicates" promise needs.
-* **Upload registry** — `uploads.csv_files` records filename, hash, table, row
+* **Upload registry** — `csv_uploads.csv_files` records filename, hash, table, row
   count and columns, which is what "Migrated files" renders.
 * **Structured logs** — every upload returns a timestamped `logs[]`, a ready
   foundation for the audit log.
@@ -56,44 +78,24 @@ CSV content is sent as a JSON string, not multipart.
 
 ## Findings
 
-### 1. Package imports — blocks testing (fix required)
+### 1. Package imports — RESOLVED
 
-`api/` uses bare imports (`from config import settings`, `from routers import
-csv_routes`). These resolve only when the process's working directory is
-`api/`, which is what `scripts/start-api.ps1` arranges with `Set-Location`.
+**Previous state:** `api/` used bare imports (`from config import settings`,
+`from routers import csv_routes`). These resolved only when the process's
+working directory was `api/`. `tests/test_api.py` therefore could not be
+collected from the repository root, leaving the API as an untested surface.
 
-The API runs correctly. But pytest collects from the repository root, so:
+**Resolution:** applied all three steps of the fix.
 
-```text
-$ python -c "import api.main"
-ModuleNotFoundError: No module named 'config'
-```
+1. `api/__init__.py`, `api/routers/__init__.py`, and `api/services/__init__.py`
+   now exist as empty package markers.
+2. Every module under `api/` uses package-relative imports
+   (`from api.config import settings`, `from api.db import Conn`, etc.).
+3. `scripts/start-api.ps1` does `Set-Location (Join-Path $PSScriptRoot "..")`
+   before invoking `python -m uvicorn api.main:app --reload --port 8000`.
 
-`tests/test_api.py` therefore cannot be collected, and the API is an **untested
-surface** — invisible even to `scripts/test_report.py`, which can only account
-for tests it can collect.
-
-The fix is mechanical:
-
-1. Add an empty `api/__init__.py`.
-2. Make imports package-relative in every module under `api/`:
-
-   ```python
-   from api.config import settings
-   from api.db import Conn
-   from api.services.dynamic_loader import upload_dynamic
-   from api.routers import csv_routes, te_routes
-   ```
-
-3. Update `scripts/start-api.ps1` to launch from the repository root:
-
-   ```powershell
-   Set-Location $PSScriptRoot\..
-   python -m uvicorn api.main:app --reload --port 8000
-   ```
-
-Verified: with package-relative imports, `from api.main import app` succeeds
-from the root and every endpoint responds.
+Verified: `python -c "from api.main import app"` succeeds from the repo root.
+`pytest tests/test_api.py` collects and runs the full suite.
 
 ### 2. No environment selector
 
@@ -111,6 +113,12 @@ audit entry, and no environment guard. That is defensible for a local
 uploads schema; it is not if the API is ever pointed at a shared or production
 database. Consider an allow-list of droppable schemas, or an
 `API_ALLOW_DESTRUCTIVE=1` gate.
+
+Update: the `API_ALLOW_DESTRUCTIVE` gate and an `audit_log` table now exist,
+and every endpoint (including this one) requires the `X-API-Key` header — see
+[Authentication](#authentication). Callers still get no per-request
+confirmation prompt; that remains a UI-level gap if accidental deletes become
+a problem in practice.
 
 ### 4. Two CSV parsers now exist
 
@@ -159,13 +167,13 @@ these were written.
 
 ## Tests
 
-`tests/test_api.py` provides 17 tests:
+`tests/test_api.py` provides 19 tests:
 
 | Group | Count | Needs a database |
 |---|---|---|
 | `unit` — health contract, request validation | 9 | No |
 | `unit` + `security` — table-name guards, AST identifier check | 3 | No |
-| `integration` — upload → list → rows → dedup round trip | 5 | Yes |
+| `integration` — upload → list → rows → dedup round trip | 7 | Yes |
 
 Per the repository's no-skip policy, the integration group **fails** with
 remediation text when the database is unreachable rather than skipping.

@@ -12,4 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Force the dev server to 5173 (matches scripts/start-frontend.ps1 and
+  // the CORS_ORIGINS default in api/config.py). Without this, lovable's
+  // sandbox detection defaults to 8080.
+  vite: {
+    server: { port: 5173, strictPort: true, host: "localhost" },
+  },
 });
