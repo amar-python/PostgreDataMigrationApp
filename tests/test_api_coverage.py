@@ -364,3 +364,64 @@ class TeUploadPipeline(_IntegrationBase):
         match = [f for f in files if f["file_name"] == f"{self.tag}.csv"]
         self.assertTrue(match, "T&E upload should appear in csv_files list")
         self.assertEqual(match[0]["mode"], "te")
+
+
+    def test_enum_constraint_violation_reported_per_row(self):
+        """An invalid enum value must produce a per-row error, not a 500."""
+        csv = self._org_csv(f"{self.tag}_enum", org_type="INVALID_ENUM")
+        r = self._upload_te(csv)
+        body = r.json()
+        self.assertEqual(body["status"], "ok", body)
+        self.assertGreaterEqual(body["failedRows"], 1,
+            "Invalid enum value should fail at row level, not crash the endpoint")
+        self.assertIn("rowNumber", body["rowErrors"][0])
+
+    def test_null_in_not_null_column_reported_per_row(self):
+        """An empty required field sent as NULL must fail per-row, not crash."""
+        csv = "name,org_type,country\n,government,AU\n"
+        r = self._upload_te(csv)
+        body = r.json()
+        self.assertEqual(body["status"], "ok", body)
+        self.assertGreaterEqual(body["failedRows"], 1,
+            "NULL in a NOT NULL column should fail at row level")
+        self.assertIn("rowNumber", body["rowErrors"][0])
+
+    def test_unknown_target_table_returns_error(self):
+        """Uploading to a table not in TE_TABLES must return status=error."""
+        r = self.client.post("/api/csv/upload", json={
+            "fileName": f"{self.tag}.csv",
+            "content": "col_a\nval\n",
+            "mode": "te",
+            "targetTable": "non_existent_table",
+        })
+        body = r.json()
+        self.assertEqual(body["status"], "error", body)
+        self.assertIn("non_existent_table", body.get("message", ""))
+
+    def test_te_reupload_same_file_replaces_registry(self):
+        """Re-uploading the same CSV in T&E mode replaces the registry entry."""
+        csv = self._org_csv(f"{self.tag}_reup")
+        r1 = self._upload_te(csv)
+        self.assertEqual(r1.json()["status"], "ok", r1.json())
+        r2 = self._upload_te(csv)
+        self.assertEqual(r2.json()["status"], "ok", r2.json())
+        files = self.client.get("/api/csv/files").json()
+        matches = [f for f in files if f["file_name"] == f"{self.tag}.csv"]
+        self.assertEqual(len(matches), 1,
+            "Re-upload should replace the registry entry, not create a duplicate")
+
+
+@pytest.mark.unit
+class DeleteGateUnit(unittest.TestCase):
+    """DELETE endpoint must honour API_ALLOW_DESTRUCTIVE=false (unit, no DB)."""
+
+    def test_delete_blocked_returns_403(self):
+        from api import config as cfg
+        original = cfg.settings.allow_destructive
+        cfg.settings.allow_destructive = False
+        try:
+            r = client.delete("/api/csv/files/1")
+            self.assertEqual(r.status_code, 403,
+                "DELETE must return 403 when API_ALLOW_DESTRUCTIVE=false")
+        finally:
+            cfg.settings.allow_destructive = original

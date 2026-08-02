@@ -10,6 +10,28 @@
 const API_URL: string =
   (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
 
+const API_KEY: string = (import.meta.env.VITE_API_KEY as string | undefined) ?? "";
+
+// One-time diagnostic on module load so an API_KEY / VITE_API_KEY mismatch is
+// easy to spot in the browser console. The API logs a parallel fingerprint at
+// startup (see api/main.py). Fixes BUG-006 in BUG_REPORT.md.
+if (typeof window !== "undefined") {
+  if (API_KEY) {
+    const fp = API_KEY.length >= 4 ? `${API_KEY.slice(0, 4)}...` : "***";
+    // eslint-disable-next-line no-console
+    console.info(
+      `[csv.functions] VITE_API_KEY is set (fingerprint: ${fp}, length: ${API_KEY.length}). ` +
+        `Backend API_KEY fingerprint must match — check the API startup log if requests 401.`,
+    );
+  } else {
+    // eslint-disable-next-line no-console
+    console.info(
+      "[csv.functions] VITE_API_KEY is empty. Fine if the backend's API_KEY is also unset. " +
+        "If requests return 401, set VITE_API_KEY in frontend/.env to match the backend's API_KEY.",
+    );
+  }
+}
+
 // ── Types (unchanged public contract) ────────────────────────────────────────
 
 export type ColumnType = "int8" | "numeric" | "date" | "timestamptz" | "boolean" | "text";
@@ -92,8 +114,12 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
-      headers: { "Content-Type": "application/json" },
       ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+        ...init?.headers,
+      },
     });
   } catch {
     throw new Error(

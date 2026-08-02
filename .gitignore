@@ -52,3 +52,6 @@ tfplan
 terraform-provider-*.log
 
 *.zip
+
+# Serena tool workspace
+.serena/

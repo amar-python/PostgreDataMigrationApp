@@ -80,4 +80,21 @@ def bootstrap() -> None:
                     "CREATE UNIQUE INDEX IF NOT EXISTS csv_files_hash_uq ON {}.csv_files (file_hash)"
                 ).format(sql.Identifier(settings.UPLOADS_SCHEMA))
             )
+            # Audit log: persistent record of every destructive operation.
+            cur.execute(
+                sql.SQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS {}.audit_log (
+                        id BIGSERIAL PRIMARY KEY,
+                        action TEXT NOT NULL,
+                        file_id BIGINT,
+                        file_name TEXT,
+                        table_name TEXT,
+                        mode TEXT,
+                        performed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    )
+                    """
+                ).format(sql.Identifier(settings.UPLOADS_SCHEMA))
+            )
         conn.commit()
+

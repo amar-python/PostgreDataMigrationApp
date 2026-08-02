@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -73,12 +73,30 @@ export const Route = createFileRoute("/_authenticated/")({
       },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(filesQuery),
+  // Prefetch the file list, but never let a fetch failure crash into the root
+  // errorComponent — the page still renders and the component shows a banner
+  // explaining that the backend is unreachable. Fixes BUG-003 in BUG_REPORT.md.
+  loader: async ({ context }) => {
+    try {
+      await context.queryClient.ensureQueryData(filesQuery);
+    } catch (err) {
+      // Swallow — useQuery in Home() will surface the same error as a banner
+      // rather than a blank error page.
+      // eslint-disable-next-line no-console
+      console.warn("CSV Migrator: prefetch of /api/csv/files failed —", err);
+    }
+  },
   component: Home,
 });
 
 function Home() {
-  const { data: files } = useSuspenseQuery(filesQuery);
+  const { data, error, isLoading, refetch, isFetching } = useQuery({
+    ...filesQuery,
+    // Give the loader's cached result priority; only refetch on mount if nothing
+    // is cached yet.
+    staleTime: 5_000,
+  });
+  const files: CsvFileSummary[] = data ?? [];
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       <Toaster richColors position="top-right" />
@@ -105,9 +123,50 @@ function Home() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-8 px-6 py-10">
+        {error ? <BackendUnreachableBanner error={error} isRetrying={isFetching} onRetry={() => refetch()} /> : null}
         <Uploader />
-        <FilesList files={files} />
+        {isLoading && !error ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading migrated files…
+          </div>
+        ) : (
+          <FilesList files={files} />
+        )}
       </main>
+    </div>
+  );
+}
+
+function BackendUnreachableBanner({
+  error,
+  isRetrying,
+  onRetry,
+}: {
+  error: unknown;
+  isRetrying: boolean;
+  onRetry: () => void;
+}) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" />
+        <div className="flex-1 space-y-2">
+          <p className="text-sm font-medium text-destructive">
+            Backend unreachable — the file list couldn't load.
+          </p>
+          <p className="text-xs text-muted-foreground">{message}</p>
+          <p className="text-xs text-muted-foreground">
+            Start the API with{" "}
+            <code className="rounded bg-muted px-1">scripts/start-api.ps1</code>{" "}
+            (Terminal 1), then click Retry. Uploads are disabled until the backend is back.
+          </p>
+          <Button size="sm" variant="outline" onClick={onRetry} disabled={isRetrying}>
+            {isRetrying ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RotateCw className="mr-1 h-3 w-3" />}
+            Retry
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

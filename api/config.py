@@ -23,6 +23,17 @@ class Settings:
 
     MAX_UPLOAD_BYTES: int = int(os.environ.get("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 
+    # Gate for the DELETE /api/csv/files/{id} endpoint.
+    # Set API_ALLOW_DESTRUCTIVE=false in shared/prod to prevent accidental table drops.
+    allow_destructive: bool = os.environ.get("API_ALLOW_DESTRUCTIVE", "true").lower() in (
+        "1", "true", "yes"
+    )
+
+    # Shared secret required on every request via the X-API-Key header.
+    # Empty in local dev by default; set API_KEY before deploying anywhere reachable
+    # beyond localhost.
+    API_KEY: str = os.environ.get("API_KEY", "")
+
 
 settings = Settings()
 
@@ -41,3 +52,4 @@ TE_TABLES = [
     "defect_reports",
     "evidence_artifacts",
 ]
+

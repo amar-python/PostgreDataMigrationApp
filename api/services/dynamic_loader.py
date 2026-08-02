@@ -10,8 +10,10 @@ All identifiers go through psycopg2.sql.Identifier — no string interpolation.
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 
+import psycopg2.errors
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 
@@ -24,6 +26,8 @@ from api.services.csv_parse import (
     sanitize_columns,
     valid_identifier,
 )
+
+logger = logging.getLogger(__name__)
 
 _TYPE_SQL = {
     "int8": "int8",
@@ -79,8 +83,32 @@ def upload_dynamic(
         }
 
     schema = settings.UPLOADS_SCHEMA
-    replaced_file_name: str | None = None
 
+    try:
+        return _do_upload(file_name, types, overwrite, logs, schema, rows, file_hash)
+    except psycopg2.Error as exc:
+        # Mirror te_loader's structured-error contract: an unexpected DB error
+        # (e.g. a column type edge case not caught by cast_value) should not
+        # surface as a raw 500 to the frontend.
+        logger.warning("Dynamic upload failed for %r: %s", file_name, exc)
+        _log(logs, "error", "Database error while loading the CSV", "error")
+        return {
+            "status": "error",
+            "message": "The CSV could not be loaded due to a database error. Check the file's data types and try again.",
+            "logs": logs,
+        }
+
+
+def _do_upload(
+    file_name: str,
+    types: list[str] | None,
+    overwrite: bool,
+    logs: list[dict],
+    schema: str,
+    rows: list[list[str]],
+    file_hash: str,
+) -> dict:
+    replaced_file_name: str | None = None
     with Conn() as conn:
         with conn.cursor() as cur:
             # Duplicate FILENAME check
@@ -251,16 +279,40 @@ def upload_dynamic(
                     inserted += len(returned)
             _log(logs, "insert", f"Inserted {inserted} rows", count=inserted)
 
-            # Register
+            # Register. The duplicate checks above are racy (check-then-act, no
+            # lock held across the row-casting work), so a concurrent identical
+            # upload can slip past them; the registry's UNIQUE indexes are the
+            # real guard, and we turn a violation here into the same
+            # structured "duplicate_file" response the earlier check returns.
             _log(logs, "register", "Registering file in csv_files")
-            cur.execute(
-                sql.SQL(
-                    "INSERT INTO {}.csv_files (file_name, file_hash, table_name, mode, row_count, column_names) "
-                    "VALUES (%s, %s, %s, 'dynamic', %s, %s) RETURNING id"
-                ).format(sql.Identifier(schema)),
-                (file_name, file_hash, table_name, inserted, columns),
-            )
-            file_id = cur.fetchone()[0]
+            try:
+                cur.execute(
+                    sql.SQL(
+                        "INSERT INTO {}.csv_files (file_name, file_hash, table_name, mode, row_count, column_names) "
+                        "VALUES (%s, %s, %s, 'dynamic', %s, %s) RETURNING id"
+                    ).format(sql.Identifier(schema)),
+                    (file_name, file_hash, table_name, inserted, columns),
+                )
+                file_id = cur.fetchone()[0]
+            except psycopg2.errors.UniqueViolation:
+                conn.rollback()
+                cur.execute(
+                    sql.SQL(
+                        "SELECT file_name, table_name, row_count FROM {}.csv_files "
+                        "WHERE file_name = %s OR file_hash = %s"
+                    ).format(sql.Identifier(schema)),
+                    (file_name, file_hash),
+                )
+                existing = cur.fetchone()
+                _log(logs, "duplicate_check", "Lost race to a concurrent identical upload", "warn")
+                return {
+                    "status": "duplicate_file",
+                    "reason": "content" if existing and existing[0] != file_name else "name",
+                    "existingFileName": existing[0] if existing else file_name,
+                    "tableName": existing[1] if existing else table_name,
+                    "existingRowCount": (existing[2] or 0) if existing else 0,
+                    "logs": logs,
+                }
 
         conn.commit()
 

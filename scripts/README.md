@@ -11,6 +11,8 @@ local (PowerShell or Bash) or in GitHub Actions.
 | `build.sh` | Linux/Mac/Cloud Shell: same | _(no CI workflow; run locally)_ |
 | `test.ps1` | Windows: run pytest + SQL suite + evals | `.github/workflows/quality-gate.yml` |
 | `test.sh` | Linux/Mac/Cloud Shell: same | `.github/workflows/quality-gate.yml` |
+| `start-api.ps1` | Terminal 1: launch the FastAPI backend on `http://localhost:8000` | _(local dev only)_ |
+| `start-frontend.ps1` | Terminal 2: launch the Vite dev server on `http://localhost:5173` | _(local dev only)_ |
 
 ## Common recipes
 
@@ -40,6 +42,19 @@ Default: local `docker build`, tag `dev`, no push. Add `--acr-build` /
 ./scripts/test.sh --only-python
 ./scripts/test.sh --skip-sql
 ```
+
+### Local — start the Web UI (two terminals)
+
+```powershell
+# Terminal 1 — FastAPI backend
+pip install -r api\requirements.txt      # first run only
+.\scripts\start-api.ps1                  # http://localhost:8000
+
+# Terminal 2 — React frontend
+.\scripts\start-frontend.ps1             # http://localhost:5173 (runs npm install on first launch)
+```
+
+`start-api.ps1` defaults the libpq env vars to the local PG 18 dev instance (`PGHOST=localhost`, `PGPORT=5433`, `PGUSER=postgres`, `PGDATABASE=te_mgmt_dev`) and prompts securely for `PGPASSWORD` if unset. `start-frontend.ps1` runs `npm install` if `node_modules/` is missing, then `npm run dev`. See the **Web UI + REST API** section of the root `README.md` for the full endpoint list, env vars, and data model.
 
 ### Build and push to ACR in one go
 

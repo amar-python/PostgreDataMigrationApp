@@ -11,6 +11,7 @@ import hashlib
 import time
 
 from psycopg2 import sql
+from psycopg2.extras import execute_values
 
 from api.config import TE_TABLES, settings
 from api.db import Conn
@@ -97,29 +98,51 @@ def upload_te(file_name: str, content: str, target_table: str) -> dict:
         sql.SQL(", ").join(sql.Identifier(c) for c in columns),
         sql.SQL(", ").join(sql.Placeholder() for _ in columns),
     )
+    batch_insert_stmt = sql.SQL("INSERT INTO {}.{} ({}) VALUES %s").format(
+        sql.Identifier(settings.TE_SCHEMA),
+        sql.Identifier(target_table),
+        sql.SQL(", ").join(sql.Identifier(c) for c in columns),
+    )
+
+    def _row_values(raw: list[str]) -> list:
+        return [
+            (raw[c].strip() if c < len(raw) and raw[c].strip() != "" else None)
+            for c in range(len(columns))
+        ]
+
+    def _insert_one(cur, row_number: int, raw: list[str]) -> None:
+        """Per-row insert with its own savepoint; used for the happy path's
+        fallback so a bad row is identified without aborting the batch."""
+        nonlocal inserted
+        cur.execute("SAVEPOINT row_sp")
+        try:
+            cur.execute(insert_stmt, _row_values(raw))
+            inserted += 1
+        except Exception as exc:  # noqa: BLE001 — report DB cast/constraint errors per row
+            cur.execute("ROLLBACK TO SAVEPOINT row_sp")
+            row_errors.append({"rowNumber": row_number, "reason": str(exc).split("\n")[0]})
+        finally:
+            cur.execute("RELEASE SAVEPOINT row_sp")
 
     with Conn() as conn:
         with conn.cursor() as cur:
-            for r, raw in enumerate(data_rows):
-                row_number = r + 1
-                values = [
-                    (raw[c].strip() if c < len(raw) and raw[c].strip() != "" else None)
-                    for c in range(len(columns))
-                ]
-                cur.execute("SAVEPOINT row_sp")
+            chunk_size = 500
+            for start in range(0, len(data_rows), chunk_size):
+                chunk = data_rows[start : start + chunk_size]
+                cur.execute("SAVEPOINT chunk_sp")
                 try:
-                    cur.execute(insert_stmt, values)
-                    inserted += 1
-                except Exception as exc:  # noqa: BLE001 — report DB cast/constraint errors per row
-                    cur.execute("ROLLBACK TO SAVEPOINT row_sp")
-                    row_errors.append(
-                        {
-                            "rowNumber": row_number,
-                            "reason": str(exc).split("\n")[0],
-                        }
+                    execute_values(
+                        cur,
+                        batch_insert_stmt.as_string(cur),
+                        [_row_values(raw) for raw in chunk],
                     )
-                finally:
-                    cur.execute("RELEASE SAVEPOINT row_sp")
+                    cur.execute("RELEASE SAVEPOINT chunk_sp")
+                    inserted += len(chunk)
+                except Exception:  # noqa: BLE001 — fall back to per-row to find the bad row(s)
+                    cur.execute("ROLLBACK TO SAVEPOINT chunk_sp")
+                    cur.execute("RELEASE SAVEPOINT chunk_sp")
+                    for i, raw in enumerate(chunk):
+                        _insert_one(cur, start + i + 1, raw)
 
             # Register the load in the shared registry (mode='te')
             file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
