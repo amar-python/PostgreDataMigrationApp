@@ -233,6 +233,66 @@ class CsvPipelineWithDatabase(unittest.TestCase):
         self.assertEqual(body["insertedRows"], 1)
         self.assertEqual(body["duplicateRowsSkipped"], 1)
 
+    def test_row_hash_does_not_collide_on_split_boundaries(self):
+        """BUG-022 regression: `["ab","cd"]` and `["a","bcd"]` used to hash to
+        the same value because the pre-hash `"".join(cells)` had no separator.
+        With the fixed `"\\x1f".join(...)` they must be treated as distinct
+        rows and both land in the table.
+        """
+        # Prefix each cell with the PID so this run's rows don't collide with a
+        # sibling run's registry entry via content-hash dedup. The interesting
+        # payload is the split-boundary pair.
+        pid = os.getpid()
+        content = (
+            "col_a,col_b\n"
+            f"{pid}ab,cd\n"
+            f"{pid}a,bcd\n"
+        )
+        r = self.client.post(
+            "/api/csv/upload",
+            json={"fileName": self.name, "content": content},
+        )
+        body = r.json()
+        self.assertEqual(body["status"], "ok", body)
+        self.assertEqual(
+            body["insertedRows"], 2,
+            "BUG-022 regression: split-boundary rows were deduplicated",
+        )
+        self.assertEqual(body["duplicateRowsSkipped"], 0)
+
+        # Confirm the physical rows landed too, not just the summary counters.
+        rows = self.client.get(
+            f"/api/csv/tables/{body['tableName']}/rows",
+            params={"limit": 10},
+        )
+        self.assertEqual(rows.status_code, 200)
+        payload = rows.json()["rows"]
+        self.assertEqual(len(payload), 2)
+        pairs = sorted((r["col_a"], r["col_b"]) for r in payload)
+        self.assertEqual(
+            pairs,
+            sorted([(f"{pid}ab", "cd"), (f"{pid}a", "bcd")]),
+        )
+
+    def test_row_hash_still_dedupes_identical_rows(self):
+        """Guard-rail for BUG-022 fix: the separator change must not break the
+        intended dedup — two byte-identical rows still count as one insert.
+        """
+        pid = os.getpid()
+        content = (
+            "col_a,col_b\n"
+            f"{pid}xy,{pid}z\n"
+            f"{pid}xy,{pid}z\n"
+        )
+        r = self.client.post(
+            "/api/csv/upload",
+            json={"fileName": self.name, "content": content},
+        )
+        body = r.json()
+        self.assertEqual(body["status"], "ok", body)
+        self.assertEqual(body["insertedRows"], 1)
+        self.assertEqual(body["duplicateRowsSkipped"], 1)
+
     def test_unregistered_table_is_404(self):
         r = self.client.get("/api/csv/tables/csv_0000000000000000/rows")
         self.assertEqual(r.status_code, 404)
