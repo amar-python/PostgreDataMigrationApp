@@ -18,13 +18,12 @@ const API_KEY: string = (import.meta.env.VITE_API_KEY as string | undefined) ?? 
 if (typeof window !== "undefined") {
   if (API_KEY) {
     const fp = API_KEY.length >= 4 ? `${API_KEY.slice(0, 4)}...` : "***";
-    // eslint-disable-next-line no-console
+
     console.info(
       `[csv.functions] VITE_API_KEY is set (fingerprint: ${fp}, length: ${API_KEY.length}). ` +
         `Backend API_KEY fingerprint must match — check the API startup log if requests 401.`,
     );
   } else {
-    // eslint-disable-next-line no-console
     console.info(
       "[csv.functions] VITE_API_KEY is empty. Fine if the backend's API_KEY is also unset. " +
         "If requests return 401, set VITE_API_KEY in frontend/.env to match the backend's API_KEY.",

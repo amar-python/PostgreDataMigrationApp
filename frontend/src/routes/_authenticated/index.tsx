@@ -89,7 +89,7 @@ export const Route = createFileRoute("/_authenticated/")({
     } catch (err) {
       // Swallow — useQuery in Home() will surface the same error as a banner
       // rather than a blank error page.
-      // eslint-disable-next-line no-console
+
       console.warn("CSV Migrator: prefetch of /api/csv/files failed —", err);
     }
   },
