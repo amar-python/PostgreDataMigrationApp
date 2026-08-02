@@ -2,14 +2,14 @@
 
 ## Fixture CSVs (`scripts/fixtures/`)
 
-| File | What it exercises |
-| --- | --- |
-| `basic.csv` | Typed inference — int8, numeric, boolean, date |
-| `ambiguous-headers.csv` | Column names that used to collide with PL/pgSQL loop vars (`i`, `t`, `s`, `idx`) |
-| `quoted.csv` | Quoted fields, embedded newlines, escaped `""` |
-| `bad-types.csv` | Rows that should land in the row-error report, not the table |
-| `dup-rows.csv` | In-file duplicate row de-duplication via `_row_hash` |
-| `empty.csv` | Header-only — should surface the "must have a header row and at least one data row" error |
+| File                    | What it exercises                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `basic.csv`             | Typed inference — int8, numeric, boolean, date                                            |
+| `ambiguous-headers.csv` | Column names that used to collide with PL/pgSQL loop vars (`i`, `t`, `s`, `idx`)          |
+| `quoted.csv`            | Quoted fields, embedded newlines, escaped `""`                                            |
+| `bad-types.csv`         | Rows that should land in the row-error report, not the table                              |
+| `dup-rows.csv`          | In-file duplicate row de-duplication via `_row_hash`                                      |
+| `empty.csv`             | Header-only — should surface the "must have a header row and at least one data row" error |
 
 Drop them onto the UI in one batch to exercise the preview + import + diagnostics + error export end to end.
 

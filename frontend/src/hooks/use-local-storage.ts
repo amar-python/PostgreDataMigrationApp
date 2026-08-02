@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const KEY = "csv-migrator:jobs:v1";
 
-export function useLocalStorageState<T>(defaultValue: T): [T, (updater: T | ((prev: T) => T)) => void, () => void] {
+export function useLocalStorageState<T>(
+  defaultValue: T,
+): [T, (updater: T | ((prev: T) => T)) => void, () => void] {
   const [state, setState] = useState<T>(defaultValue);
   const hydrated = useRef(false);
 

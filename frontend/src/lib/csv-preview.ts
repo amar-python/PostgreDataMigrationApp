@@ -23,18 +23,49 @@ function parseCsv(text: string): string[][] {
     const ch = src[i];
     if (inQuotes) {
       if (ch === '"') {
-        if (src[i + 1] === '"') { field += '"'; i += 2; continue; }
-        inQuotes = false; i++; continue;
+        if (src[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
       }
-      field += ch; i++; continue;
+      field += ch;
+      i++;
+      continue;
     }
-    if (ch === '"') { inQuotes = true; i++; continue; }
-    if (ch === ",") { row.push(field); field = ""; i++; continue; }
-    if (ch === "\r") { i++; continue; }
-    if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
-    field += ch; i++;
+    if (ch === '"') {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (ch === ",") {
+      row.push(field);
+      field = "";
+      i++;
+      continue;
+    }
+    if (ch === "\r") {
+      i++;
+      continue;
+    }
+    if (ch === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+      i++;
+      continue;
+    }
+    field += ch;
+    i++;
   }
-  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
   while (rows.length && rows[rows.length - 1].every((c) => c === "")) rows.pop();
   return rows;
 }
@@ -44,7 +75,8 @@ export function sanitizeColumns(headers: string[]): string[] {
   const seen = new Map<string, number>();
   return headers.map((h, idx) => {
     let base = (h || `column_${idx + 1}`)
-      .toLowerCase().trim()
+      .toLowerCase()
+      .trim()
       .replace(/[^a-z0-9_]+/g, "_")
       .replace(/^_+|_+$/g, "");
     if (!base) base = `column_${idx + 1}`;
@@ -91,7 +123,10 @@ function pickType(candidates: Set<ColumnType>): ColumnType {
   return "text";
 }
 
-export async function parseCsvPreview(file: File, opts?: { sampleRows?: number; maxBytes?: number }): Promise<CsvPreview> {
+export async function parseCsvPreview(
+  file: File,
+  opts?: { sampleRows?: number; maxBytes?: number },
+): Promise<CsvPreview> {
   const maxBytes = opts?.maxBytes ?? 512 * 1024; // 512KB for preview
   const sampleCount = opts?.sampleRows ?? 10;
   const inferRowLimit = 200;
@@ -105,8 +140,14 @@ export async function parseCsvPreview(file: File, opts?: { sampleRows?: number; 
 
   if (rows.length === 0) {
     return {
-      headers: [], sanitizedHeaders: [], sampleRows: [], inferredTypes: [],
-      totalRowsApprox: 0, bytesRead: slice.size, bytesTotal: file.size, truncated,
+      headers: [],
+      sanitizedHeaders: [],
+      sampleRows: [],
+      inferredTypes: [],
+      totalRowsApprox: 0,
+      bytesRead: slice.size,
+      bytesTotal: file.size,
+      truncated,
     };
   }
 
@@ -116,7 +157,9 @@ export async function parseCsvPreview(file: File, opts?: { sampleRows?: number; 
   const sample = dataRows.slice(0, sampleCount);
 
   // Infer types
-  const perCol: Set<ColumnType>[] = headers.map(() => new Set(["int8", "numeric", "date", "timestamptz", "boolean", "text"]));
+  const perCol: Set<ColumnType>[] = headers.map(
+    () => new Set(["int8", "numeric", "date", "timestamptz", "boolean", "text"]),
+  );
   for (let r = 0; r < Math.min(dataRows.length, inferRowLimit); r++) {
     const row = dataRows[r];
     for (let c = 0; c < headers.length; c++) {
@@ -138,8 +181,14 @@ export async function parseCsvPreview(file: File, opts?: { sampleRows?: number; 
   }
 
   return {
-    headers, sanitizedHeaders: sanitized, sampleRows: sample, inferredTypes,
-    totalRowsApprox, bytesRead: slice.size, bytesTotal: file.size, truncated,
+    headers,
+    sanitizedHeaders: sanitized,
+    sampleRows: sample,
+    inferredTypes,
+    totalRowsApprox,
+    bytesRead: slice.size,
+    bytesTotal: file.size,
+    truncated,
   };
 }
 
