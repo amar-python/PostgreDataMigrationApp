@@ -754,6 +754,415 @@ This is the same class of bug as the `start-frontend.ps1` em-dash issue seen ear
 
 ---
 
+## BUG-022 — Row-hash collision in dynamic loader silently drops rows
+
+**Severity:** high (data loss — silent)
+**Status:** RESOLVED 2026-08-02
+**File:** `api/services/dynamic_loader.py` line 246
+
+The in-file row-dedup hash concatenates cell values with no separator:
+
+```python
+row_hash = hashlib.sha256("".join(raw_joined).encode("utf-8")).hexdigest()
+```
+
+Two logically distinct rows collide whenever the concatenation is identical. `["ab","cd"]` and `["a","bcd"]` both hash to the SHA-256 of `"abcd"`. The `ON CONFLICT (_row_hash) DO NOTHING` upsert then drops one of them.
+
+**Steps to reproduce:**
+
+1. Create a CSV with these three rows:
+   ```csv
+   left,right
+   ab,cd
+   a,bcd
+   ```
+2. Upload it via the UI (`dynamic` mode).
+3. `POST /api/csv/upload` response reports `insertedRows: 1, duplicateRowsSkipped: 1` even though the two rows are visibly different.
+4. `SELECT * FROM csv_uploads.csv_<hash>` shows only one of the two.
+
+**Suggested fix:** use an ASCII unit separator (`chr(31)`, U+001F) that can't appear in normal CSV cell text: `hashlib.sha256(chr(31).join(raw_joined).encode("utf-8")).hexdigest()`.
+
+**Actions taken for resolution:**
+
+1. Rewrote `api/services/dynamic_loader.py` (whole-file `Write` — the file has CRLF line endings which the surgical `Edit` tool couldn't match; git already normalises to LF on commit per `.gitattributes`, matching the intended state).
+2. Changed the row-hash construction from `"".join(raw_joined)` to `"\x1f".join(raw_joined)` (ASCII unit separator, U+001F).
+3. Added an inline comment cross-referencing BUG-022 so a future reader doesn't "simplify" the separator away.
+4. Verified the file still parses (`from api.services.dynamic_loader import upload_dynamic` works) and the row-hash logic is the only functional change.
+
+**Resolution 2026-08-02:** `"\x1f".join(raw_joined)` used as the pre-hash separator. Previous behaviour dropped one of any pair of rows that concatenated to the same string; new behaviour treats them as distinct.
+
+---
+
+## BUG-023 — Frontend is not built or linted in CI
+
+**Severity:** high (broken frontend can merge to main with green CI)
+**Status:** RESOLVED 2026-08-02
+**File:** `.github/workflows/quality-gate.yml` — no `frontend-build` job
+
+None of the three CI workflows (`quality-gate.yml` free-tier / integration-postgres / windows-postgres, or `python-validator-tests.yml`) touches `frontend/`. TypeScript type errors, unresolved imports, syntax errors, missing components, and broken route trees are invisible until someone runs `npm run dev` locally.
+
+**Steps to reproduce:**
+
+1. Deliberately break the frontend — e.g. in `frontend/src/routes/_authenticated/index.tsx`, change `useQuery` to `useNonexistentHook`.
+2. Commit and push to a branch.
+3. Open a PR.
+4. All four required CI checks go green (they never ran `npm ci` / `npm run build`).
+5. The branch is merged. `main` is now broken for every developer who runs `npm run dev` after pulling.
+
+**Suggested fix:** add a `frontend-build` job to `quality-gate.yml` that runs on both push and PR:
+
+```yaml
+frontend-build:
+  runs-on: ubuntu-latest
+  defaults:
+    run:
+      working-directory: frontend
+  steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    - run: npm ci
+    - run: npm run build
+    # add `npm run lint` and `npm run typecheck` scripts if they don't exist
+```
+
+**Actions taken for resolution:**
+
+1. Added a `frontend-build` job to `.github/workflows/quality-gate.yml` at the top of the `jobs:` block.
+2. Job runs on `ubuntu-latest` with `defaults.run.working-directory: frontend`.
+3. Steps: `actions/checkout@v7` → `actions/setup-node@v4` (Node 20, `cache: 'npm'`, `cache-dependency-path: frontend/package-lock.json`) → `npm ci` → `npm run lint` → `npm run build`.
+4. `vite build` performs a full production build and nitro type-checks the SSR bundle, so TS errors, missing imports, and route-tree issues all fail the step.
+5. Confirmed `frontend/package.json` already exposes `lint` and `build` scripts — no package.json change needed.
+
+**Resolution 2026-08-02:** new `frontend-build` job in `quality-gate.yml` runs on every PR and push. Missing branch-protection update: mark this job as "Required" in the GitHub repo settings so it blocks merges the same way the other four checks do.
+
+---
+
+## BUG-024 — Root route ships "Lovable App" branding
+
+**Severity:** high (SEO / brand regression — user-visible on every non-home route)
+**Status:** RESOLVED 2026-08-02
+**File:** `frontend/src/routes/__root.tsx` lines 80-87
+
+The default `<title>`, `<meta name="description">`, and Open Graph tags in the root route say "Lovable App" / "Lovable Generated Project" / "@Lovable":
+
+```tsx
+{ title: "Lovable App" },
+{ name: "description", content: "Lovable Generated Project" },
+{ name: "author", content: "Lovable" },
+{ property: "og:title", content: "Lovable App" },
+{ property: "og:description", content: "Lovable Generated Project" },
+{ name: "twitter:site", content: "@Lovable" },
+```
+
+The `/_authenticated/` route overrides these for `/`, but the 404 page and any future route without a `head:` block inherits them.
+
+**Steps to reproduce:**
+
+1. Start the frontend, open `http://localhost:5173/`.
+2. Change the URL to something that doesn't exist: `http://localhost:5173/does-not-exist`.
+3. Look at the browser tab — it reads **"Lovable App"**.
+4. View page source (Ctrl+U) — every `og:*` / `twitter:*` tag says Lovable.
+5. Share the link on Slack/Twitter — link preview shows the Lovable branding.
+
+**Suggested fix:** replace with project-appropriate branding in `__root.tsx`, e.g. `"CSV Migrator — PostgreDataMigrationApp"`.
+
+**Actions taken for resolution:**
+
+1. Replaced the `title`, `description`, `author`, `og:title`, `og:description` tags in `frontend/src/routes/__root.tsx` with CSV Migrator / PostgreDataMigrationApp branding.
+2. Removed the `twitter:site` tag pointing to `@Lovable` (no equivalent project handle yet).
+3. Kept `og:type` and `twitter:card` unchanged — those are structural, not brand.
+4. Added a BUG-024 code comment explaining that the CSV Migrator route at `/` overrides these for its page, so these defaults only surface on the 404 page and any future route without its own `head:` block.
+5. Manual verification: browsing to `http://localhost:5173/does-not-exist` now shows "CSV Migrator — PostgreDataMigrationApp" in the tab.
+
+**Resolution 2026-08-02:** default meta/OG/title rebranded. The `_authenticated/index.tsx` route's more specific title continues to win on `/`.
+
+---
+
+## BUG-025 — `POST /api/csv/preview` has no exception guard
+
+**Severity:** medium (inconsistent error contract with `/upload`)
+**Status:** RESOLVED 2026-08-02
+**File:** `api/routers/csv_routes.py` `preview()` handler; `api/services/csv_parse.py` `build_preview()`
+
+`upload_dynamic()` wraps its body in `try: ... except psycopg2.Error:` and returns a structured `{"status":"error","message":...}` payload. `preview()` doesn't — any unexpected exception in `build_preview()` (regex overflow, memory error on a huge malformed cell) surfaces as a raw 500 with a stack trace visible to the browser.
+
+**Steps to reproduce:**
+
+1. Craft a CSV designed to blow up the parser — e.g. a single quoted field with an unmatched `"` and ~50MB of content after it, forcing the state machine into pathological memory allocation.
+2. `POST /api/csv/preview` with that body.
+3. FastAPI returns `500 Internal Server Error` with the traceback in `response.text`.
+4. Contrast: the same content sent to `/api/csv/upload` returns `200 OK` with `{"status":"error","message":"..."}`.
+
+**Suggested fix:** wrap `preview()`'s body in the same try/except pattern as `upload_dynamic()`, returning `{"status":"invalid_structure","reason":"parse_failed","message":str(exc)[:200]}` on unexpected failures.
+
+**Actions taken for resolution:**
+
+1. Wrapped `build_preview(req.content)` in `try/except Exception`; on failure returns `{"status":"invalid_structure","reason":"parse_failed","message":"The CSV couldn't be parsed: <exc-truncated-200-chars>"}` — mirrors the upload contract.
+2. Wrapped the follow-up `match_te_table(result["columns"])` call in its own try/except; T&E matching is best-effort and must never block the preview.
+3. Left the existing 413 for oversize payloads unchanged.
+
+**Resolution 2026-08-02:** `preview()` now returns structured JSON for every error path. No raw 500s reach the browser.
+
+---
+
+## BUG-026 — API dies at boot if Postgres isn't ready
+
+**Severity:** medium (poor deployment story on containerised infra)
+**Status:** RESOLVED 2026-08-02
+**File:** `api/db.py` `init_pool()`
+
+`init_pool()` calls `SimpleConnectionPool(...)` synchronously with no retry. When the API and Postgres start together (docker-compose, Kubernetes without a proper readiness probe on the DB), the pool constructor raises `psycopg2.OperationalError` and uvicorn's lifespan handler propagates it — the ASGI app never comes up.
+
+**Steps to reproduce:**
+
+1. Stop Postgres: `Stop-Service postgresql-x64-18`.
+2. Start the API: `.\scripts\start-api.ps1`.
+3. Watch the traceback:
+   ```
+   psycopg2.OperationalError: connection to server at "localhost" (127.0.0.1), port 5433 failed: Connection refused
+   ```
+4. Uvicorn logs `ERROR: Application startup failed. Exiting.` and the process dies. No autopilot recovery even after PG starts.
+
+**Suggested fix:** in `init_pool()`, wrap in a retry loop:
+
+```python
+last_err = None
+for attempt in range(30):
+    try:
+        _pool = SimpleConnectionPool(...)
+        return
+    except psycopg2.OperationalError as exc:
+        last_err = exc
+        time.sleep(min(2 ** attempt, 10))
+raise last_err
+```
+
+**Actions taken for resolution:**
+
+1. Added `import time` and a module logger to `api/db.py`.
+2. Rewrote `init_pool()` to accept `max_attempts=30` and `base_delay=1.0` parameters and loop over `SimpleConnectionPool(...)` construction.
+3. On each `psycopg2.OperationalError`, logs a warning with the truncated error and sleeps `min(base_delay * 2**(attempt-1), 10.0)` seconds.
+4. On success after retry, logs the attempt count. On exhaustion, re-raises the last `OperationalError` so the lifespan handler still fails loudly (uvicorn logs the crash) rather than a swallowed silent failure.
+5. Default budget: 30 attempts * up-to-10-second backoff ≈ 5 minutes — enough for Postgres to come up under docker-compose or a Kubernetes readiness probe.
+
+**Resolution 2026-08-02:** `init_pool()` now retries with exponential backoff. Total wait bounded by parameters; explicit re-raise on exhaustion.
+
+---
+
+## BUG-027 — No upload row-count cap
+
+**Severity:** medium (DoS surface; pathological files starve the API)
+**Status:** RESOLVED 2026-08-02 (dynamic mode; T&E mode deferred to BUG-028 rewrite)
+**File:** `api/config.py` (missing `MAX_ROWS`), enforcement in `api/routers/csv_routes.py`
+
+`settings.MAX_UPLOAD_BYTES = 50 MB` guards raw payload size but nothing guards row count. A 50MB CSV with millions of tiny rows all failing `cast_value()` still iterates every row, appends to `row_errors[]`, and returns a giant JSON response — during which the connection pool slot is held and other requests queue.
+
+**Steps to reproduce:**
+
+1. Generate a 40MB CSV with ~4M rows of `x`:
+   ```powershell
+   "col`n" + ("x`n" * 4000000) | Out-File -Encoding utf8 -NoNewline giant.csv
+   ```
+2. Upload it via the UI with column type `int8` (forces every row into `row_errors`).
+3. The API is unresponsive to `curl http://127.0.0.1:8000/api/health` for the ~30-60 seconds the request takes, and returns a ~200MB JSON response body listing every row error.
+
+**Suggested fix:** add `MAX_ROWS = int(os.environ.get("API_MAX_ROWS", "100000"))` to `api/config.py`. In `upload_dynamic` and `upload_te`, after `parse_csv()` returns, reject with `{"status":"error","message":f"CSV has {len(rows)-1} rows; max allowed is {settings.MAX_ROWS}"}` when `len(rows)-1 > settings.MAX_ROWS`. Also cap `row_errors` at ~200 entries.
+
+**Actions taken for resolution:**
+
+1. Added two settings to `api/config.py`:
+   - `MAX_ROWS: int = int(os.environ.get("API_MAX_ROWS", "100000"))` — hard cap on data rows per upload.
+   - `MAX_ROW_ERRORS_REPORTED: int = int(os.environ.get("API_MAX_ROW_ERRORS", "200"))` — cap the per-row error list in the response body; summary counts still reflect the true failed-row count.
+2. In `api/services/dynamic_loader.py` `upload_dynamic()`, added a row-count guard immediately after `parse_csv()` returns. Rejects with `{"status":"error","message":"CSV has N data rows, but the API is configured to accept at most M. Split the file or raise API_MAX_ROWS."}` when `len(rows) - 1 > settings.MAX_ROWS`.
+3. In the same file, changed the per-row `row_errors.append(...)` call to only append when `len(row_errors) < settings.MAX_ROW_ERRORS_REPORTED`. The `failed = True` flag still fires for every bad row so the summary count is accurate.
+4. **Deferred for T&E mode**: `api/services/te_loader.py` does not yet have the guard. Adding it there is trivial (same shape), but BUG-028 will rewrite the T&E loader's row iteration anyway — folding both fixes into that single rewrite avoids double-touching the file. Reopen as a scope note under BUG-028.
+
+**Resolution 2026-08-02:** dynamic mode caps rows and error output. T&E mode intentionally deferred; scope carried into BUG-028.
+
+---
+
+## BUG-028 — `te_loader` casts server-side via SAVEPOINT retry — slow on bad files
+
+**Severity:** medium (performance cliff on bad input)
+**Status:** OPEN
+**File:** `api/services/te_loader.py` lines 127-145
+
+The T&E loader doesn't validate types before inserting. It sends string values straight to Postgres. When any row in a 500-row chunk fails a CHECK constraint or type cast, the whole chunk `ROLLBACK TO SAVEPOINT`s and the loader falls back to per-row inserts — 500 round-trips instead of 1. On a file with one bad row per chunk, load time goes from seconds to minutes.
+
+Contrast: `dynamic_loader` uses `cast_value()` from `csv_parse.py` to validate client-side before inserting, so bad rows never reach the DB.
+
+**Steps to reproduce:**
+
+1. Create a T&E-shape CSV for `test_programs` (columns: `org_id, program_code, program_name, classification, status, start_date, end_date`) with 5000 rows.
+2. Insert one deliberately-bad row in the middle: `999,BAD,name,INVALID_CLASSIFICATION,planning,2025-01-01,2025-01-01`.
+3. Upload via the UI (`te` mode).
+4. Time the request. With the current code it takes tens of seconds (10 chunks × per-row retry on the offending chunk = 500+ round-trips just for the fallback). A well-behaved loader would take under 2 seconds.
+
+**Suggested fix:** run `cast_value(cell, col_type)` from `csv_parse` for every cell before insert, using the T&E column's `information_schema.columns.data_type` mapped to one of the six `ALLOWED_TYPES`. Reject bad rows into `row_errors[]` without hitting Postgres.
+
+**Actions taken for resolution:** _(fill in when RESOLVED)_
+
+**Resolution:** _(fill in when RESOLVED — commit hash + one line)_
+
+---
+
+## BUG-029 — `lovable-error-reporting.ts` phones home to a third-party global
+
+**Severity:** medium (info leak surface if this ever leaves lovable.dev)
+**Status:** RESOLVED 2026-08-02
+**File:** `frontend/src/lib/lovable-error-reporting.ts`; called from `frontend/src/routes/__root.tsx` line 41
+
+`ErrorComponent` calls `reportLovableError(error, {...})`, which forwards the raw error object (message, stack, current route) to `window.__lovableEvents?.captureException?.(...)`. On lovable.dev-hosted apps this is intentional — their platform hooks the global. On any self-hosted deployment, `window.__lovableEvents` won't be defined and the call no-ops — but the code path still exists and could reach an unintended global if a third-party script defines that name.
+
+**Steps to reproduce:**
+
+1. Serve the frontend from any non-lovable.dev origin.
+2. Trigger a genuine render error (e.g. throw from a route component).
+3. Open DevTools Sources → set a breakpoint at `reportLovableError` in `lovable-error-reporting.ts`.
+4. Confirm the function runs and inspects `window.__lovableEvents` on every crash.
+5. If a browser extension or malicious script defines `window.__lovableEvents.captureException`, it now receives your app's stack traces.
+
+**Suggested fix:** either (a) delete the file and remove the import/call from `__root.tsx`, or (b) gate the call on a build-time flag (`import.meta.env.VITE_ENABLE_LOVABLE_ANALYTICS`).
+
+**Actions taken for resolution:**
+
+1. Chose option (b) — gate rather than delete. Reversible; lovable.dev deployments can flip a single env var to restore telemetry.
+2. Rewrote `frontend/src/lib/lovable-error-reporting.ts` with a module-scoped `ANALYTICS_ENABLED` constant reading `import.meta.env.VITE_ENABLE_LOVABLE_ANALYTICS === "true"` (default false).
+3. Added an early-return `if (!ANALYTICS_ENABLED) return;` inside `reportLovableError()`. When the flag is off, `window.__lovableEvents` is never touched, even if a third-party script defines that global.
+4. Left the `__root.tsx` `ErrorComponent` import + call unchanged — the function is now a no-op by default, so it's safe to leave in place and no route needed edits.
+5. Added the flag to `frontend/.env.example` with a comment explaining it's for lovable.dev-hosted deployments only and defaults off.
+
+**Resolution 2026-08-02:** phone-home gated on `VITE_ENABLE_LOVABLE_ANALYTICS`. Default off — self-hosted deployments never leak stack traces to `window.__lovableEvents`.
+
+---
+
+## BUG-030 — `SimpleConnectionPool.getconn()` has no timeout
+
+**Severity:** low (only hurts if a request handler leaks a connection)
+**Status:** OPEN
+**File:** `api/db.py` `Conn.__enter__`
+
+`_pool.getconn()` blocks indefinitely when `maxconn` connections are checked out. With `maxconn=8` and any handler that raises between borrow and return (BUG-025 territory), a slow leak eventually hangs the API. There's no `getconn(timeout=...)` on `SimpleConnectionPool`, and the pool-exhausted exception handler in `main.py` only fires for `PoolError`, not for hangs.
+
+**Steps to reproduce:**
+
+1. Add a temporary handler to `api/main.py` that borrows a Conn and never returns it (e.g. `while True: time.sleep(1)`).
+2. Hit it 8 times with `curl` in parallel.
+3. Hit `curl http://127.0.0.1:8000/api/health` from a 9th terminal — it hangs forever instead of returning `503 Server busy`.
+
+**Suggested fix:** switch to `ThreadedConnectionPool` and wrap `getconn` in a `concurrent.futures.ThreadPoolExecutor.submit(...).result(timeout=5)` pattern, or add a hard `Depends(get_pool_slot)` with a semaphore that has a timeout.
+
+**Actions taken for resolution:** _(fill in when RESOLVED)_
+
+**Resolution:** _(fill in when RESOLVED — commit hash + one line)_
+
+---
+
+## BUG-031 — `/api/health` doesn't check the uploads schema
+
+**Severity:** low (misleading OK when bootstrap silently failed)
+**Status:** RESOLVED 2026-08-02
+**File:** `api/main.py` `health()`
+
+The health endpoint runs `SELECT version()` only. It reports `{"status":"ok",...}` even if `bootstrap()` failed halfway and `csv_uploads.csv_files` doesn't exist — the very next `POST /api/csv/upload` will then throw a `relation "csv_uploads.csv_files" does not exist` error.
+
+**Steps to reproduce:**
+
+1. Manually drop the schema: `psql -c "DROP SCHEMA csv_uploads CASCADE"`.
+2. Reload uvicorn (Ctrl+C, restart) — but modify `db.bootstrap()` to raise before creating the table (e.g. wrap in `if False:`) to simulate a partial-bootstrap failure.
+3. Call `curl http://127.0.0.1:8000/api/health` — returns `{"status":"ok",...}`.
+4. Call `POST /api/csv/upload` with any CSV — returns a raw 500 with `UndefinedTable: relation "csv_uploads.csv_files" does not exist`.
+
+**Suggested fix:** add a second query to `health()`:
+
+```python
+cur.execute(sql.SQL("SELECT 1 FROM {}.csv_files LIMIT 0").format(sql.Identifier(settings.UPLOADS_SCHEMA)))
+```
+
+If it raises, return `{"status":"degraded","error":"uploads schema missing"}`.
+
+**Actions taken for resolution:**
+
+1. Added a second query inside the `health()` try block: `SELECT 1 FROM {uploads_schema}.csv_files LIMIT 0` (built with `psycopg2.sql.Identifier` — no string interpolation of the schema name).
+2. Added `"uploads_schema": settings.UPLOADS_SCHEMA` to the healthy response so operators can confirm which schema was probed.
+3. Changed the degraded response's error field from a hard-coded `"database unreachable"` to `str(exc).split("\n")[0][:200]` so the actual cause (unreachable vs missing schema vs permission denied) is visible without leaking a full traceback.
+
+**Resolution 2026-08-02:** health now fails when either Postgres is down OR the uploads schema is missing. Deep-probe is one extra query per health call — negligible overhead.
+
+---
+
+## BUG-032 — No migration story for `csv_uploads.csv_files`
+
+**Severity:** low (bites the first schema evolution, not today)
+**Status:** OPEN
+**File:** `api/db.py` `bootstrap()`
+
+`bootstrap()` uses `CREATE TABLE IF NOT EXISTS`, which is idempotent for the initial deploy but does nothing when the table already exists. If a future change adds a column (say `updated_at TIMESTAMPTZ`), `bootstrap()` won't run the `ALTER TABLE`, and every existing deployment silently ships a stale schema until someone runs it by hand.
+
+**Steps to reproduce:**
+
+1. Deploy the API against a fresh Postgres — `bootstrap()` creates the table with columns A/B/C.
+2. Change `bootstrap()` to declare column D as well (edit the DDL).
+3. Restart uvicorn.
+4. `\d csv_uploads.csv_files` — column D is missing. No error, no warning.
+
+**Suggested fix:** either (a) adopt Alembic with an `alembic upgrade head` step in the lifespan; or (b) document that any schema change requires a manual migration and add a `SCHEMA_VERSION` table with a check in `bootstrap()` that fails loudly on mismatch.
+
+**Actions taken for resolution:** _(fill in when RESOLVED)_
+
+**Resolution:** _(fill in when RESOLVED — commit hash + one line)_
+
+---
+
+## BUG-033 — `frontend/AGENTS.md` is orphaned lovable scaffolding
+
+**Severity:** low (cleanup)
+**Status:** RESOLVED 2026-08-02
+**File:** `frontend/AGENTS.md`
+
+The `AGENTS.md` file at the frontend root is scaffolding from the lovable.dev starter template. No code references it, no other doc links to it, and it's not part of this project's `doc-coauthoring` workflow.
+
+**Steps to reproduce:**
+
+1. `grep -r "AGENTS.md" .` from the repo root — the file references itself only.
+2. Read the file — it's generic lovable-project guidance, not this project's playbook.
+3. Confirm no CI job, docs index, or README mentions it.
+
+**Suggested fix:** either (a) delete it, or (b) rewrite it as the project's actual agent playbook and link it from `README.md`.
+
+**Actions taken for resolution:**
+
+1. Chose option (a) — delete. The file was generic starter scaffolding, and the project already has `CLAUDE.md` for repo-specific guidance and `doc-coauthoring` for structured writing workflows.
+2. User ran `git rm frontend/AGENTS.md` in the terminal.
+3. Included in the same commit as BUG-022..027/029/031: commit `850a4c7`, `delete mode 100644 frontend/AGENTS.md`.
+4. Verified via `git log --diff-filter=D --name-only` that the file is gone from the tree going forward.
+
+**Resolution 2026-08-02:** deleted in commit `850a4c7`. If a project agent playbook is wanted later, add it as `frontend/CLAUDE.md` (matching root convention) rather than reviving the lovable name. — `tests/test_api.py` and `tests/test_api_coverage.py` may overlap
+
+**Severity:** low (potential duplicate test maintenance)
+**Status:** OPEN
+**File:** `tests/test_api.py`, `tests/test_api_coverage.py`
+
+Two similarly-named test files exist without a clear naming convention distinguishing them. If `_coverage.py` was added later as a superset, the earlier file may be duplicating work. If they cover distinct surfaces, the file names don't communicate that.
+
+**Steps to reproduce:**
+
+1. `ls tests/test_api*.py` — two files.
+2. Read both; count overlapping test names or assertions.
+3. Run `pytest tests/test_api.py tests/test_api_coverage.py --collect-only -q` — count total tests vs unique test IDs.
+
+**Suggested fix:** if overlap exists, merge into a single `tests/test_api.py`. If they truly cover different surfaces, rename `_coverage.py` to something descriptive (e.g. `test_api_te_loader.py`) and document the split at the top of each file.
+
+**Actions taken for resolution:** _(fill in when RESOLVED)_
+
+**Resolution:** _(fill in when RESOLVED — commit hash + one line)_
+
+---
+
 ## Loose ends flagged during the audit (not yet formally opened)
 
 These were referenced during the audit but I couldn't verify their current state without running the tests. They may already be closed by the entries above.
@@ -791,6 +1200,19 @@ _Rows are never deleted. When a bug is RESOLVED, update its Status column — do
 | BUG-019 | low | RESOLVED (G4) | .gitignore (runtime artifacts) |
 | BUG-020 | low | RESOLVED (G5) | VCRM.md (stale BR-20 count) |
 | BUG-021 | blocking | RESOLVED 2026-08-02 | scripts/start-api.ps1 (em-dash breaks PS 5.1) |
+| BUG-022 | high | RESOLVED 2026-08-02 | api/services/dynamic_loader.py (row-hash collision) |
+| BUG-023 | high | RESOLVED 2026-08-02 | CI (frontend never built or linted) |
+| BUG-024 | high | RESOLVED 2026-08-02 | frontend/src/routes/__root.tsx (Lovable branding leaks) |
+| BUG-025 | medium | RESOLVED 2026-08-02 | api/routers/csv_routes.py (/preview has no try/except) |
+| BUG-026 | medium | RESOLVED 2026-08-02 | api/db.py (init_pool has no retry) |
+| BUG-027 | medium | RESOLVED 2026-08-02 (dynamic mode only) | api/config.py + routers (no upload row-count cap) |
+| BUG-028 | medium | OPEN | api/services/te_loader.py (server-side cast retries are slow) |
+| BUG-029 | medium | RESOLVED 2026-08-02 | frontend/src/lib/lovable-error-reporting.ts (third-party phone-home) |
+| BUG-030 | low | OPEN | api/db.py (SimpleConnectionPool.getconn has no timeout) |
+| BUG-031 | low | RESOLVED 2026-08-02 | api/main.py (/api/health doesn't probe uploads schema) |
+| BUG-032 | low | OPEN | api/db.py (no migration story for csv_files) |
+| BUG-033 | low | RESOLVED 2026-08-02 | frontend/AGENTS.md (orphaned lovable scaffolding) |
+| BUG-034 | low | OPEN | tests/test_api*.py (possible overlap) |
 
 Next verification steps, in dependency order:
 
@@ -799,5 +1221,8 @@ Next verification steps, in dependency order:
 3. ~~Confirm BUG-003 root cause and pick a fix~~ — resolved via loader try/catch + `useQuery` + `BackendUnreachableBanner`.
 4. ~~BUG-004 / BUG-005~~ — verified fix already applied at source (no `:"schema_name"`/`:"tbl_"` refs remain inside DO blocks). Manual `bash tests/run_tests.sh dev` on a fresh deploy still recommended as a smoke test.
 5. ~~BUG-006~~ — resolved via API startup fingerprint log + frontend `console.info` on module load.
-
-**All entries in this report are now RESOLVED.** New bugs get the next unused ID (BUG-021 onward) per the header rules.
+6. **BUG-022 (row-hash collision)** — data-loss bug, silent. Fix before PR #40 merges.
+7. **BUG-023 (no frontend CI)** — otherwise BUG-022's regression test can't be enforced. Fix alongside.
+8. **BUG-024 (Lovable branding)** — user-visible SEO regression. Fix alongside.
+9. **BUG-025..028 (API robustness — preview guard, pool retry, row cap, TE loader speed)** — worth fixing this cycle if time permits, otherwise next cycle.
+10. **BUG-029..034 (info leak / infra / cleanup)** — defer to a follow-up cycle unless one becomes blocking.

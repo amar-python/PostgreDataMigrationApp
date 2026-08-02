@@ -82,6 +82,25 @@ def upload_dynamic(
             "logs": logs,
         }
 
+    # BUG-027 guard: reject files above the configured row cap before doing any
+    # per-row work. `rows` includes the header, so subtract one.
+    data_row_count = len(rows) - 1
+    if data_row_count > settings.MAX_ROWS:
+        _log(
+            logs,
+            "error",
+            f"CSV has {data_row_count} data rows; max allowed is {settings.MAX_ROWS}.",
+            "error",
+        )
+        return {
+            "status": "error",
+            "message": (
+                f"CSV has {data_row_count} data rows, but the API is configured to "
+                f"accept at most {settings.MAX_ROWS}. Split the file or raise API_MAX_ROWS."
+            ),
+            "logs": logs,
+        }
+
     schema = settings.UPLOADS_SCHEMA
 
     try:
@@ -235,15 +254,28 @@ def _do_upload(
                     raw_joined.append(cell)
                     ok, val, reason = cast_value(cell, col_types[c])
                     if not ok:
-                        row_errors.append(
-                            {"rowNumber": row_number, "column": columns[c], "value": cell, "reason": reason}
-                        )
+                        # BUG-027: cap row_errors to keep response bodies bounded on
+                        # pathological files. The count in the summary line still
+                        # reflects every failed row.
+                        if len(row_errors) < settings.MAX_ROW_ERRORS_REPORTED:
+                            row_errors.append(
+                                {
+                                    "rowNumber": row_number,
+                                    "column": columns[c],
+                                    "value": cell,
+                                    "reason": reason,
+                                }
+                            )
                         failed = True
                         break
                     values.append(val)
                 if failed:
                     continue
-                row_hash = hashlib.sha256("".join(raw_joined).encode("utf-8")).hexdigest()
+                # BUG-022: ASCII unit separator (U+001F) between cells prevents
+                # ["ab","cd"] and ["a","bcd"] from hashing to the same value.
+                row_hash = hashlib.sha256(
+                    "\x1f".join(raw_joined).encode("utf-8")
+                ).hexdigest()
                 if row_hash in seen:
                     duplicates += 1
                     continue

@@ -23,6 +23,15 @@ class Settings:
 
     MAX_UPLOAD_BYTES: int = int(os.environ.get("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 
+    # BUG-027: cap total rows accepted per upload so a pathological file (millions
+    # of rows all failing type-cast) can't monopolise the API. Default 100k rows.
+    MAX_ROWS: int = int(os.environ.get("API_MAX_ROWS", "100000"))
+
+    # BUG-027: cap the per-row error list in the response body. Prevents 100MB
+    # JSON responses when a whole file fails validation. The summary counts
+    # still reflect the true failed-row count.
+    MAX_ROW_ERRORS_REPORTED: int = int(os.environ.get("API_MAX_ROW_ERRORS", "200"))
+
     # Gate for the DELETE /api/csv/files/{id} endpoint.
     # Set API_ALLOW_DESTRUCTIVE=false in shared/prod to prevent accidental table drops.
     allow_destructive: bool = os.environ.get("API_ALLOW_DESTRUCTIVE", "true").lower() in (

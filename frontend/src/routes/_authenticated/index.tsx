@@ -30,7 +30,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast, Toaster } from "sonner";
 import {
@@ -82,7 +89,7 @@ export const Route = createFileRoute("/_authenticated/")({
     } catch (err) {
       // Swallow — useQuery in Home() will surface the same error as a banner
       // rather than a blank error page.
-      // eslint-disable-next-line no-console
+
       console.warn("CSV Migrator: prefetch of /api/csv/files failed —", err);
     }
   },
@@ -117,13 +124,18 @@ function Home() {
             <Badge variant="secondary" className="hidden sm:inline-flex">
               {files.length} file{files.length === 1 ? "" : "s"} migrated
             </Badge>
-
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl space-y-8 px-6 py-10">
-        {error ? <BackendUnreachableBanner error={error} isRetrying={isFetching} onRetry={() => refetch()} /> : null}
+        {error ? (
+          <BackendUnreachableBanner
+            error={error}
+            isRetrying={isFetching}
+            onRetry={() => refetch()}
+          />
+        ) : null}
         <Uploader />
         {isLoading && !error ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -157,12 +169,15 @@ function BackendUnreachableBanner({
           </p>
           <p className="text-xs text-muted-foreground">{message}</p>
           <p className="text-xs text-muted-foreground">
-            Start the API with{" "}
-            <code className="rounded bg-muted px-1">scripts/start-api.ps1</code>{" "}
+            Start the API with <code className="rounded bg-muted px-1">scripts/start-api.ps1</code>{" "}
             (Terminal 1), then click Retry. Uploads are disabled until the backend is back.
           </p>
           <Button size="sm" variant="outline" onClick={onRetry} disabled={isRetrying}>
-            {isRetrying ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RotateCw className="mr-1 h-3 w-3" />}
+            {isRetrying ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <RotateCw className="mr-1 h-3 w-3" />
+            )}
             Retry
           </Button>
         </div>
@@ -173,15 +188,8 @@ function BackendUnreachableBanner({
 
 // Auth removed — the app talks to the local FastAPI backend with no login.
 
-
 type JobStatus =
-  | "reading"
-  | "uploading"
-  | "processing"
-  | "done"
-  | "duplicate"
-  | "error"
-  | "interrupted";
+  "reading" | "uploading" | "processing" | "done" | "duplicate" | "error" | "interrupted";
 
 type Job = {
   id: string;
@@ -222,10 +230,7 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   interrupted: "Interrupted",
 };
 
-function readFileWithProgress(
-  file: File,
-  onProgress: (pct: number) => void,
-): Promise<string> {
+function readFileWithProgress(file: File, onProgress: (pct: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onprogress = (e) => {
@@ -233,8 +238,7 @@ function readFileWithProgress(
         onProgress(Math.round((e.loaded / e.total) * 60));
       }
     };
-    reader.onerror = () =>
-      reject(reader.error ?? new Error("Could not read the file."));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read the file."));
     reader.onload = () => resolve(String(reader.result ?? ""));
     reader.readAsText(file);
   });
@@ -269,9 +273,7 @@ function Uploader() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const running = jobs.some((j) =>
-    ["reading", "uploading", "processing"].includes(j.status),
-  );
+  const running = jobs.some((j) => ["reading", "uploading", "processing"].includes(j.status));
 
   const updateJob = useCallback(
     (id: string, patch: Partial<Job>) => {
@@ -314,7 +316,9 @@ function Uploader() {
           const prefix = res.overwritten ? "overwrote previous upload · " : "";
           toast.success(
             `${job.name}: ${prefix}${res.insertedRows} of ${res.totalRows} rows imported` +
-              (res.duplicateRowsSkipped ? ` · ${res.duplicateRowsSkipped} duplicate rows skipped` : "") +
+              (res.duplicateRowsSkipped
+                ? ` · ${res.duplicateRowsSkipped} duplicate rows skipped`
+                : "") +
               (res.failedRows ? ` · ${res.failedRows} failed` : ""),
           );
           await router.invalidate();
@@ -393,31 +397,28 @@ function Uploader() {
     [runJob, setJobs],
   );
 
-  const handleFiles = useCallback(
-    async (files: File[]) => {
-      const csvs = files.filter(
-        (f) => f.name.toLowerCase().endsWith(".csv") || f.type === "text/csv",
-      );
-      if (csvs.length === 0) {
-        toast.error("Please drop .csv files.");
-        return;
+  const handleFiles = useCallback(async (files: File[]) => {
+    const csvs = files.filter(
+      (f) => f.name.toLowerCase().endsWith(".csv") || f.type === "text/csv",
+    );
+    if (csvs.length === 0) {
+      toast.error("Please drop .csv files.");
+      return;
+    }
+    const batchId = `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const previews: PendingPreview[] = [];
+    for (const f of csvs) {
+      try {
+        const p = await parseCsvPreview(f);
+        previews.push({ file: f, preview: p, batchId });
+      } catch (err) {
+        toast.error(`${f.name}: ${(err as Error).message}`);
       }
-      const batchId = `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const previews: PendingPreview[] = [];
-      for (const f of csvs) {
-        try {
-          const p = await parseCsvPreview(f);
-          previews.push({ file: f, preview: p, batchId });
-        } catch (err) {
-          toast.error(`${f.name}: ${(err as Error).message}`);
-        }
-      }
-      if (previews.length === 0) return;
-      setPending(previews);
-      setPreviewIndex(0);
-    },
-    [],
-  );
+    }
+    if (previews.length === 0) return;
+    setPending(previews);
+    setPreviewIndex(0);
+  }, []);
 
   const confirmAll = useCallback(async () => {
     const items = pending;
@@ -548,17 +549,37 @@ function formatBytes(bytes: number): string {
 
 function StatusPill({ status }: { status: JobStatus }) {
   const map: Record<JobStatus, { cls: string; icon: ReactNode }> = {
-    reading: { cls: "bg-muted text-muted-foreground", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
-    uploading: { cls: "bg-muted text-muted-foreground", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
-    processing: { cls: "bg-muted text-muted-foreground", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
-    done: { cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400", icon: <CheckCircle2 className="h-3 w-3" /> },
-    duplicate: { cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400", icon: <AlertTriangle className="h-3 w-3" /> },
+    reading: {
+      cls: "bg-muted text-muted-foreground",
+      icon: <Loader2 className="h-3 w-3 animate-spin" />,
+    },
+    uploading: {
+      cls: "bg-muted text-muted-foreground",
+      icon: <Loader2 className="h-3 w-3 animate-spin" />,
+    },
+    processing: {
+      cls: "bg-muted text-muted-foreground",
+      icon: <Loader2 className="h-3 w-3 animate-spin" />,
+    },
+    done: {
+      cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      icon: <CheckCircle2 className="h-3 w-3" />,
+    },
+    duplicate: {
+      cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+      icon: <AlertTriangle className="h-3 w-3" />,
+    },
     error: { cls: "bg-destructive/10 text-destructive", icon: <XCircle className="h-3 w-3" /> },
-    interrupted: { cls: "bg-slate-500/10 text-slate-600 dark:text-slate-400", icon: <PauseCircle className="h-3 w-3" /> },
+    interrupted: {
+      cls: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+      icon: <PauseCircle className="h-3 w-3" />,
+    },
   };
   const cfg = map[status];
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cfg.cls}`}
+    >
       {cfg.icon}
       {STATUS_LABEL[status]}
     </span>
@@ -593,7 +614,9 @@ function BatchSummary({ jobs }: { jobs: Job[] }) {
   const failedRows = batchJobs.reduce((s, j) => s + (j.failedRows ?? 0), 0);
   const dupFiles = batchJobs.filter((j) => j.status === "duplicate").length;
   const failedFiles = batchJobs.filter((j) => j.status === "error").length;
-  const inProgress = batchJobs.filter((j) => ["reading", "uploading", "processing"].includes(j.status)).length;
+  const inProgress = batchJobs.filter((j) =>
+    ["reading", "uploading", "processing"].includes(j.status),
+  ).length;
 
   const stat = (label: string, value: number, cls?: string) => (
     <div className="flex flex-col">
@@ -674,7 +697,11 @@ function DiagnosticsPanel({ jobs }: { jobs: Job[] }) {
         </div>
         <CollapsibleTrigger asChild>
           <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-            {open ? <ChevronDown className="mr-1 h-3 w-3" /> : <ChevronRight className="mr-1 h-3 w-3" />}
+            {open ? (
+              <ChevronDown className="mr-1 h-3 w-3" />
+            ) : (
+              <ChevronRight className="mr-1 h-3 w-3" />
+            )}
             {open ? "Hide" : "Show"} details
           </Button>
         </CollapsibleTrigger>
@@ -711,7 +738,9 @@ function DiagnosticsPanel({ jobs }: { jobs: Job[] }) {
                     </td>
                     <td className="max-w-[160px] truncate px-2 py-1">{e.file}</td>
                     <td className="px-2 py-1 capitalize">{e.step.replace(/_/g, " ")}</td>
-                    <td className={`px-2 py-1 ${e.level === "error" ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`}>
+                    <td
+                      className={`px-2 py-1 ${e.level === "error" ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`}
+                    >
                       {e.message}
                     </td>
                   </tr>
@@ -720,14 +749,14 @@ function DiagnosticsPanel({ jobs }: { jobs: Job[] }) {
             </table>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">No warnings or errors in the latest batch.</p>
+          <p className="text-xs text-muted-foreground">
+            No warnings or errors in the latest batch.
+          </p>
         )}
       </CollapsibleContent>
     </Collapsible>
   );
 }
-
-
 
 function UploadReport({
   jobs,
@@ -818,9 +847,7 @@ function JobRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-sm font-medium">{job.name}</span>
-            <span className="text-xs text-muted-foreground">
-              {formatBytes(job.size)}
-            </span>
+            <span className="text-xs text-muted-foreground">{formatBytes(job.size)}</span>
             <div className="ml-auto flex items-center gap-2">
               <StatusPill status={job.status} />
               {canExport && <ExportErrorsMenu job={job} />}
@@ -835,7 +862,12 @@ function JobRow({
                 </Button>
               )}
               {(isError || isDuplicate || isInterrupted) && (
-                <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onRetry(job.id)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2"
+                  onClick={() => onRetry(job.id)}
+                >
                   <RotateCw className="mr-1 h-3 w-3" /> Retry
                 </Button>
               )}
@@ -863,11 +895,16 @@ function JobRow({
             <p className="mt-2 text-xs text-muted-foreground">
               {job.overwritten ? "Overwrote previous upload · " : ""}
               Imported {job.insertedRows} of {job.totalRows ?? job.insertedRows} rows
-              {job.duplicateRowsSkipped ? ` · ${job.duplicateRowsSkipped} duplicate rows skipped` : ""}
-              {job.failedRows ? ` · ${job.failedRows} row${job.failedRows === 1 ? "" : "s"} failed validation` : ""}
+              {job.duplicateRowsSkipped
+                ? ` · ${job.duplicateRowsSkipped} duplicate rows skipped`
+                : ""}
+              {job.failedRows
+                ? ` · ${job.failedRows} row${job.failedRows === 1 ? "" : "s"} failed validation`
+                : ""}
               {job.tableName ? (
                 <>
-                  {" "}· stored in <code className="rounded bg-muted px-1">{job.tableName}</code>
+                  {" "}
+                  · stored in <code className="rounded bg-muted px-1">{job.tableName}</code>
                 </>
               ) : null}
             </p>
@@ -877,20 +914,30 @@ function JobRow({
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
               {job.duplicateReason === "name" ? (
                 <>
-                  A file named <span className="font-medium">{job.name}</span> is already imported with different contents
-                  {typeof job.existingRowCount === "number" ? <> ({job.existingRowCount} rows)</> : null}.
-                  Rename the file to keep both, or click <span className="font-medium">Overwrite</span> to replace it.
+                  A file named <span className="font-medium">{job.name}</span> is already imported
+                  with different contents
+                  {typeof job.existingRowCount === "number" ? (
+                    <> ({job.existingRowCount} rows)</>
+                  ) : null}
+                  . Rename the file to keep both, or click{" "}
+                  <span className="font-medium">Overwrite</span> to replace it.
                 </>
               ) : (
                 <>
                   Already imported — this file's contents are identical to
                   {job.existingFileName ? (
-                    <> <span className="font-medium">"{job.existingFileName}"</span></>
+                    <>
+                      {" "}
+                      <span className="font-medium">"{job.existingFileName}"</span>
+                    </>
                   ) : (
                     <> a previously uploaded file</>
                   )}
-                  {typeof job.existingRowCount === "number" ? <> ({job.existingRowCount} rows)</> : null}
-                  . Skipped automatically — click <span className="font-medium">Overwrite</span> to re-import.
+                  {typeof job.existingRowCount === "number" ? (
+                    <> ({job.existingRowCount} rows)</>
+                  ) : null}
+                  . Skipped automatically — click <span className="font-medium">Overwrite</span> to
+                  re-import.
                 </>
               )}
             </p>
@@ -960,9 +1007,18 @@ function ExportErrorsMenu({ job }: { job: Job }) {
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
     const safeName = job.name.replace(/\.csv$/i, "").replace(/[^a-z0-9_-]+/gi, "_");
     if (format === "json") {
-      blob = new Blob([JSON.stringify({ file: job.name, generatedAt: new Date().toISOString(), entries }, null, 2)], {
-        type: "application/json",
-      });
+      blob = new Blob(
+        [
+          JSON.stringify(
+            { file: job.name, generatedAt: new Date().toISOString(), entries },
+            null,
+            2,
+          ),
+        ],
+        {
+          type: "application/json",
+        },
+      );
       filename = `errors-${safeName}-${ts}.json`;
     } else {
       const header = ["file", "row_number", "column", "value", "reason", "plain_english"];
@@ -972,7 +1028,9 @@ function ExportErrorsMenu({ job }: { job: Job }) {
       };
       const lines = [header.join(",")].concat(
         entries.map((e) =>
-          [e.file, e.rowNumber || "", e.column ?? "", e.value ?? "", e.reason, e.plainEnglish].map(escape).join(","),
+          [e.file, e.rowNumber || "", e.column ?? "", e.value ?? "", e.reason, e.plainEnglish]
+            .map(escape)
+            .join(","),
         ),
       );
       blob = new Blob([lines.join("\n")], { type: "text/csv" });
@@ -1013,7 +1071,8 @@ function ExportErrorsMenu({ job }: { job: Job }) {
     toast.success("Logs downloaded");
   };
 
-  const hasErrorContent = !!job.errorMessage || job.status === "duplicate" || (job.rowErrors?.length ?? 0) > 0;
+  const hasErrorContent =
+    !!job.errorMessage || job.status === "duplicate" || (job.rowErrors?.length ?? 0) > 0;
   const hasLogs = (job.logs?.length ?? 0) > 0;
 
   return (
@@ -1037,7 +1096,6 @@ function ExportErrorsMenu({ job }: { job: Job }) {
     </DropdownMenu>
   );
 }
-
 
 function ErrorPanel({
   job,
@@ -1075,7 +1133,11 @@ function ErrorPanel({
             <div className="flex items-center gap-2">
               <CollapsibleTrigger asChild>
                 <Button size="sm" variant="outline" className="h-7 px-2 text-xs">
-                  {open ? <ChevronDown className="mr-1 h-3 w-3" /> : <ChevronRight className="mr-1 h-3 w-3" />}
+                  {open ? (
+                    <ChevronDown className="mr-1 h-3 w-3" />
+                  ) : (
+                    <ChevronRight className="mr-1 h-3 w-3" />
+                  )}
                   {open ? "Hide" : "Show"} technical details
                 </Button>
               </CollapsibleTrigger>
@@ -1110,7 +1172,8 @@ function ErrorPanel({
                   </table>
                   {job.rowErrors!.length > 50 && (
                     <p className="p-2 text-[11px] text-muted-foreground">
-                      Showing first 50 of {job.rowErrors!.length} row errors — download the full report above.
+                      Showing first 50 of {job.rowErrors!.length} row errors — download the full
+                      report above.
                     </p>
                   )}
                 </div>
@@ -1125,23 +1188,35 @@ function ErrorPanel({
 
 function hintFor(message: string): string | null {
   const m = message.toLowerCase();
-  if (m.includes("header row")) return "The file must include a header row followed by at least one data row.";
-  if (m.includes("no columns")) return "No usable column names were found in the first row of the CSV.";
-  if (m.includes("invalid table name")) return "The server rejected the auto-generated table name. Try re-uploading the file.";
-  if (m.includes("could not create table")) return "The database refused to create a table for this file. Check that column names in the header row are valid.";
-  if (m.includes("insert failed")) return "Some rows could not be inserted. The most common cause is inconsistent numbers of columns across rows.";
-  if (m.includes("could not register file")) return "The file was processed but its registry entry could not be written. Try again.";
-  if (m.includes("network") || m.includes("fetch")) return "A network error interrupted the upload. Check your connection and retry.";
+  if (m.includes("header row"))
+    return "The file must include a header row followed by at least one data row.";
+  if (m.includes("no columns"))
+    return "No usable column names were found in the first row of the CSV.";
+  if (m.includes("invalid table name"))
+    return "The server rejected the auto-generated table name. Try re-uploading the file.";
+  if (m.includes("could not create table"))
+    return "The database refused to create a table for this file. Check that column names in the header row are valid.";
+  if (m.includes("insert failed"))
+    return "Some rows could not be inserted. The most common cause is inconsistent numbers of columns across rows.";
+  if (m.includes("could not register file"))
+    return "The file was processed but its registry entry could not be written. Try again.";
+  if (m.includes("network") || m.includes("fetch"))
+    return "A network error interrupted the upload. Check your connection and retry.";
   return null;
 }
 
 function hintForRow(re: RowError): string | null {
   const r = re.reason.toLowerCase();
-  if (r.includes("whole number")) return `Row ${re.rowNumber}: column "${re.column}" expected a whole number but got "${re.value}".`;
-  if (r.includes("not a number")) return `Row ${re.rowNumber}: column "${re.column}" expected a number but got "${re.value}".`;
-  if (r.includes("true/false")) return `Row ${re.rowNumber}: column "${re.column}" expected true/false but got "${re.value}".`;
-  if (r.includes("date")) return `Row ${re.rowNumber}: column "${re.column}" expected a valid date but got "${re.value}".`;
-  if (r.includes("timestamp")) return `Row ${re.rowNumber}: column "${re.column}" expected a valid timestamp but got "${re.value}".`;
+  if (r.includes("whole number"))
+    return `Row ${re.rowNumber}: column "${re.column}" expected a whole number but got "${re.value}".`;
+  if (r.includes("not a number"))
+    return `Row ${re.rowNumber}: column "${re.column}" expected a number but got "${re.value}".`;
+  if (r.includes("true/false"))
+    return `Row ${re.rowNumber}: column "${re.column}" expected true/false but got "${re.value}".`;
+  if (r.includes("date"))
+    return `Row ${re.rowNumber}: column "${re.column}" expected a valid date but got "${re.value}".`;
+  if (r.includes("timestamp"))
+    return `Row ${re.rowNumber}: column "${re.column}" expected a valid timestamp but got "${re.value}".`;
   return `Row ${re.rowNumber}${re.column ? ` (${re.column})` : ""}: ${re.reason}`;
 }
 
@@ -1193,7 +1268,6 @@ function PreviewDialog({
           </div>
 
           <div className="min-h-0 flex-1 overflow-auto rounded border">
-
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
@@ -1202,7 +1276,9 @@ function PreviewDialog({
                       <div className="flex flex-col gap-0.5 py-1">
                         <span className="text-xs font-semibold">{h}</span>
                         {preview.headers[i] !== h && (
-                          <span className="text-[10px] text-muted-foreground">from "{preview.headers[i]}"</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            from "{preview.headers[i]}"
+                          </span>
                         )}
                         <span className="mt-1 inline-flex w-fit rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                           {COLUMN_TYPE_LABEL[preview.inferredTypes[i]]}
@@ -1224,7 +1300,10 @@ function PreviewDialog({
                 ))}
                 {preview.sampleRows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={preview.sanitizedHeaders.length} className="text-center text-xs text-muted-foreground">
+                    <TableCell
+                      colSpan={preview.sanitizedHeaders.length}
+                      className="text-center text-xs text-muted-foreground"
+                    >
                       No data rows found.
                     </TableCell>
                   </TableRow>
@@ -1234,8 +1313,9 @@ function PreviewDialog({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Column names are sanitized for the database. Detected types come from the first {Math.min(preview.sampleRows.length, 200)} rows.
-            Values that don't match a column's type will be reported as row errors instead of being imported.
+            Column names are sanitized for the database. Detected types come from the first{" "}
+            {Math.min(preview.sampleRows.length, 200)} rows. Values that don't match a column's type
+            will be reported as row errors instead of being imported.
           </p>
         </div>
 
@@ -1244,7 +1324,12 @@ function PreviewDialog({
             <Button variant="outline" size="sm" onClick={onPrev} disabled={index === 0}>
               Previous
             </Button>
-            <Button variant="outline" size="sm" onClick={onNext} disabled={index >= pending.length - 1}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onNext}
+              disabled={index >= pending.length - 1}
+            >
               Next
             </Button>
           </div>
@@ -1297,11 +1382,14 @@ function FilesList({ files }: { files: CsvFileSummary[] }) {
                     <TableCell>
                       <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{f.table_name}</code>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{f.column_names.length}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {f.column_names.length}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{f.row_count}</TableCell>
                     <TableCell className="text-muted-foreground">
                       <time dateTime={f.created_at} suppressHydrationWarning>
-                        {new Date(f.created_at).toISOString().replace("T", " ").slice(0, 19) + " UTC"}
+                        {new Date(f.created_at).toISOString().replace("T", " ").slice(0, 19) +
+                          " UTC"}
                       </time>
                     </TableCell>
                     <TableCell className="text-right">
@@ -1321,9 +1409,7 @@ function FilesList({ files }: { files: CsvFileSummary[] }) {
         <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-5xl flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="truncate">{preview?.file_name}</DialogTitle>
-            <DialogDescription>
-              First rows of the imported table.
-            </DialogDescription>
+            <DialogDescription>First rows of the imported table.</DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-auto">
             {preview ? <PreviewTable file={preview} /> : null}
@@ -1373,7 +1459,10 @@ function PreviewTable({ file }: { file: CsvFileSummary }) {
           ))}
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={file.column_names.length} className="text-center text-muted-foreground">
+              <TableCell
+                colSpan={file.column_names.length}
+                className="text-center text-muted-foreground"
+              >
                 No rows.
               </TableCell>
             </TableRow>
@@ -1381,7 +1470,8 @@ function PreviewTable({ file }: { file: CsvFileSummary }) {
         </TableBody>
       </Table>
       <p className="p-2 text-xs text-muted-foreground">
-        Showing up to 50 rows. Table has {file.row_count} row{file.row_count === 1 ? "" : "s"} total.
+        Showing up to 50 rows. Table has {file.row_count} row{file.row_count === 1 ? "" : "s"}{" "}
+        total.
       </p>
     </div>
   );

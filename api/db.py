@@ -1,25 +1,52 @@
 """Connection pool + one-time schema bootstrap for the uploads registry."""
 
+import logging
+import time
+
 import psycopg2
 import psycopg2.pool
 from psycopg2 import sql
 
 from api.config import settings
 
+logger = logging.getLogger(__name__)
+
 _pool: psycopg2.pool.SimpleConnectionPool | None = None
 
 
-def init_pool() -> None:
+def init_pool(max_attempts: int = 30, base_delay: float = 1.0) -> None:
+    """Create the pool, retrying on connection errors.
+
+    BUG-026: on containerised infra Postgres may not accept connections when
+    the API starts. Retry with exponential backoff (capped at 10s) instead of
+    dying at boot. Total wait is bounded by ``max_attempts`` * cap.
+    """
     global _pool
-    _pool = psycopg2.pool.SimpleConnectionPool(
-        minconn=1,
-        maxconn=8,
-        host=settings.PG_HOST,
-        port=settings.PG_PORT,
-        user=settings.PG_USER,
-        password=settings.PG_PASSWORD,
-        dbname=settings.PG_DATABASE,
-    )
+    last_err: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            _pool = psycopg2.pool.SimpleConnectionPool(
+                minconn=1,
+                maxconn=8,
+                host=settings.PG_HOST,
+                port=settings.PG_PORT,
+                user=settings.PG_USER,
+                password=settings.PG_PASSWORD,
+                dbname=settings.PG_DATABASE,
+            )
+            if attempt > 1:
+                logger.info("Connected to Postgres on attempt %d", attempt)
+            return
+        except psycopg2.OperationalError as exc:
+            last_err = exc
+            delay = min(base_delay * (2 ** (attempt - 1)), 10.0)
+            logger.warning(
+                "Postgres not reachable (attempt %d/%d): %s. Retrying in %.1fs.",
+                attempt, max_attempts, str(exc).split("\n")[0][:120], delay,
+            )
+            time.sleep(delay)
+    assert last_err is not None
+    raise last_err
 
 
 def close_pool() -> None:
