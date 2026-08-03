@@ -77,14 +77,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      // BUG-024: project branding for any route without its own head: block
+      // (e.g. the 404 page and future routes). The CSV Migrator page at "/"
+      // overrides these in _authenticated/index.tsx.
+      { title: "CSV Migrator — PostgreDataMigrationApp" },
+      {
+        name: "description",
+        content:
+          "Upload CSV files, preview inferred types, and load them into PostgreSQL — dynamic tables or a fixed T&E schema.",
+      },
+      { name: "author", content: "PostgreDataMigrationApp" },
+      { property: "og:title", content: "CSV Migrator — PostgreDataMigrationApp" },
+      {
+        property: "og:description",
+        content: "Turn CSV files into database tables with automatic de-duplication.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

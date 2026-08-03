@@ -1,6 +1,7 @@
 """Connection pool + Alembic-driven schema bootstrap for the uploads registry."""
 
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from pathlib import Path
 
@@ -19,21 +20,43 @@ _getconn_executor: ThreadPoolExecutor | None = None
 _MAXCONN = 8
 
 
-def init_pool() -> None:
+def init_pool(max_attempts: int = 30, base_delay: float = 1.0) -> None:
     """Create the shared pool. Uses ThreadedConnectionPool so parallel FastAPI
     handlers can borrow/return connections without blocking each other's
     getconn() calls (SimpleConnectionPool is not thread-safe).
+
+    BUG-026: on containerised infra Postgres may not accept connections when
+    the API starts. Retry with exponential backoff (capped at 10s per attempt)
+    instead of dying at boot. Total wait bounded by ``max_attempts`` × cap.
     """
     global _pool, _getconn_executor
-    _pool = psycopg2.pool.ThreadedConnectionPool(
-        minconn=1,
-        maxconn=_MAXCONN,
-        host=settings.PG_HOST,
-        port=settings.PG_PORT,
-        user=settings.PG_USER,
-        password=settings.PG_PASSWORD,
-        dbname=settings.PG_DATABASE,
-    )
+    last_err: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            _pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=_MAXCONN,
+                host=settings.PG_HOST,
+                port=settings.PG_PORT,
+                user=settings.PG_USER,
+                password=settings.PG_PASSWORD,
+                dbname=settings.PG_DATABASE,
+            )
+            if attempt > 1:
+                logger.info("Connected to Postgres on attempt %d", attempt)
+            break
+        except psycopg2.OperationalError as exc:
+            last_err = exc
+            delay = min(base_delay * (2 ** (attempt - 1)), 10.0)
+            logger.warning(
+                "Postgres not reachable (attempt %d/%d): %s. Retrying in %.1fs.",
+                attempt, max_attempts, str(exc).split("\n")[0][:120], delay,
+            )
+            time.sleep(delay)
+    else:
+        assert last_err is not None
+        raise last_err
+
     # BUG-030: worker count = maxconn + a few, so a burst of concurrent
     # requests can all queue their getconn() calls without the executor
     # itself becoming the bottleneck.
