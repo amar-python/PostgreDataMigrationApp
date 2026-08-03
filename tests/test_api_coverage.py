@@ -410,6 +410,59 @@ class TeUploadPipeline(_IntegrationBase):
         self.assertEqual(len(matches), 1,
             "Re-upload should replace the registry entry, not create a duplicate")
 
+    def test_te_client_side_type_validation_reports_column_and_value(self):
+        """BUG-028: a bad value on a client-validatable column (BOOLEAN here)
+        must be rejected by the pre-insert cast_value() pass, not by the DB.
+
+        The client-side path structures row_errors with column + value + reason
+        fields; the server-side SAVEPOINT fallback only produces rowNumber +
+        reason. Asserting the extra fields proves the fast path took the row.
+        """
+        csv = (
+            "name,org_type,country,is_active\n"
+            f"{self.tag}_ok,government,AU,true\n"
+            f"{self.tag}_bad,government,AU,NOT_A_BOOL\n"
+        )
+        r = self._upload_te(csv, target_table="organisations")
+        body = r.json()
+        self.assertEqual(body["status"], "ok", body)
+        self.assertEqual(body["failedRows"], 1)
+        self.assertEqual(body["insertedRows"], 1,
+            "The valid row should still land while the bad row is skipped.")
+        self.assertTrue(body["rowErrors"], "rowErrors must be populated")
+        err = body["rowErrors"][0]
+        # These two fields are the fingerprint of the client-side path.
+        self.assertEqual(err.get("column"), "is_active",
+            f"Client-side validator must set column; got {err!r}")
+        self.assertEqual(err.get("value"), "NOT_A_BOOL",
+            f"Client-side validator must set value; got {err!r}")
+        self.assertIn("true/false", err["reason"].lower())
+
+    def test_te_upload_rejects_over_row_cap(self):
+        """BUG-027 for T&E mode: a CSV with more than settings.MAX_ROWS data
+        rows must be rejected up-front with status=error and never reach the DB.
+        """
+        from api import config as cfg
+        original = cfg.settings.MAX_ROWS
+        cfg.settings.MAX_ROWS = 2  # keep the test small
+        try:
+            csv = "name,org_type,country\n" + "".join(
+                f"{self.tag}_row{i},government,AU\n" for i in range(5)
+            )
+            r = self._upload_te(csv, target_table="organisations")
+            body = r.json()
+            self.assertEqual(body["status"], "error", body)
+            # Message reads "CSV has N data rows, but the API is configured
+            # to accept at most M." — assert the identifying phrase.
+            self.assertIn("at most", body["message"].lower())
+            # Sanity check: no rows leaked to the DB.
+            files = self.client.get("/api/csv/files").json()
+            matches = [f for f in files if f["file_name"] == f"{self.tag}.csv"]
+            self.assertFalse(matches,
+                "An over-cap upload must not create a registry entry.")
+        finally:
+            cfg.settings.MAX_ROWS = original
+
 
 @pytest.mark.unit
 class DeleteGateUnit(unittest.TestCase):

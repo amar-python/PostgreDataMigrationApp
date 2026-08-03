@@ -23,6 +23,16 @@ class Settings:
 
     MAX_UPLOAD_BYTES: int = int(os.environ.get("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 
+    # BUG-027: cap total rows accepted per upload so a pathological file (millions
+    # of rows all failing type-cast) can't monopolise the API. Default 100k rows.
+    # Also enforced by te_loader.py (BUG-028) once folded into T&E mode.
+    MAX_ROWS: int = int(os.environ.get("API_MAX_ROWS", "100000"))
+
+    # BUG-027: cap the per-row error list in the response body. Prevents 100MB
+    # JSON responses when a whole file fails validation. The summary counts
+    # still reflect the true failed-row count.
+    MAX_ROW_ERRORS_REPORTED: int = int(os.environ.get("API_MAX_ROW_ERRORS", "200"))
+
     # BUG-030: bound how long a request handler waits to borrow a pool slot.
     # If every one of maxconn connections is checked out (leak or long-running
     # query), the (maxconn+1)-th request raises after this many seconds instead

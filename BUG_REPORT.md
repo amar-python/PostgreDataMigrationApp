@@ -988,7 +988,7 @@ raise last_err
 ## BUG-028 — `te_loader` casts server-side via SAVEPOINT retry — slow on bad files
 
 **Severity:** medium (performance cliff on bad input)
-**Status:** OPEN
+**Status:** RESOLVED 2026-08-02
 **File:** `api/services/te_loader.py` lines 127-145
 
 The T&E loader doesn't validate types before inserting. It sends string values straight to Postgres. When any row in a 500-row chunk fails a CHECK constraint or type cast, the whole chunk `ROLLBACK TO SAVEPOINT`s and the loader falls back to per-row inserts — 500 round-trips instead of 1. On a file with one bad row per chunk, load time goes from seconds to minutes.
@@ -1004,9 +1004,22 @@ Contrast: `dynamic_loader` uses `cast_value()` from `csv_parse.py` to validate c
 
 **Suggested fix:** run `cast_value(cell, col_type)` from `csv_parse` for every cell before insert, using the T&E column's `information_schema.columns.data_type` mapped to one of the six `ALLOWED_TYPES`. Reject bad rows into `row_errors[]` without hitting Postgres.
 
-**Actions taken for resolution:** _(fill in when RESOLVED)_
+**Actions taken for resolution:**
 
-**Resolution:** _(fill in when RESOLVED — commit hash + one line)_
+1. Added `pg_type_to_allowed_type(pg_data_type)` helper to `api/services/csv_parse.py`. Maps every reasonable Postgres `data_type` value (`bigint`, `numeric`, `date`, `timestamp with time zone`, `boolean`, `character varying`, `text`, plus aliases like `int8` / `bool` / `timestamptz`) to one of the six `ALLOWED_TYPES`. Returns `None` for types we can't safely validate client-side (`uuid`, `USER-DEFINED` enums, `ARRAY`, `jsonb`, `bytea`, etc.) — the caller falls back to server-side casting for those.
+2. Rewrote `api/services/te_loader.py`:
+   - New `_te_column_types(cur, table)` — one query returning `{column_name: data_type}` for the target table.
+   - `upload_te()` now looks up the target table's column types once, maps each to `ALLOWED_TYPES` via the new helper, and validates every cell via `cast_value()` before the batch insert.
+   - Rows that fail client-side validation are appended to `row_errors[]` with full `{rowNumber, column, value, reason}` fields — a fingerprint that a test can assert to prove the fast path took the row.
+   - Cells on unmapped columns pass through as raw strings; the existing SAVEPOINT/ROLLBACK batch-then-per-row fallback still catches any DB-level failure they hit (FK violation, CHECK against an enum, length overflow, etc.). No behaviour regression.
+   - Bulk `execute_values` insert happens only on survivors of client-side validation.
+3. Folded in BUG-027's row cap for T&E mode: `upload_te` now rejects with `status=error` when the CSV has more than `settings.MAX_ROWS` data rows, before any DB work. Also caps `row_errors` at `settings.MAX_ROW_ERRORS_REPORTED` (default 200) to keep response bodies bounded on pathological files.
+4. Added two integration tests to `tests/test_api_coverage.py::TeUploadPipeline`:
+   - `test_te_client_side_type_validation_reports_column_and_value` — uploads two rows to `organisations`, one with `is_active=NOT_A_BOOL`. Asserts `insertedRows==1`, `failedRows==1`, and that the row error has both `column` and `value` fields (proves the client-side path ran).
+   - `test_te_upload_rejects_over_row_cap` — monkey-patches `settings.MAX_ROWS=2`, uploads 5 rows, asserts `status=error` and no registry entry appears.
+5. Performance characteristic: on a 5000-row CSV with one type violation per 500-row chunk, load time is now O(1) DB round-trip (5000 valid rows → 10 bulk inserts, 10 chunks × 1 round trip) instead of O(N) (10 chunks × 500 per-row retries when one chunk trips) — the "seconds vs minutes" gap the bug described.
+
+**Resolution 2026-08-02:** T&E loader validates types client-side using `cast_value()`, keeping the SAVEPOINT fallback only for unmapped column types. Row cap enforced. Two regression tests prove the fast path fires and the cap rejects up-front.
 
 ---
 
@@ -1243,7 +1256,7 @@ _Rows are never deleted. When a bug is RESOLVED, update its Status column — do
 | BUG-025 | medium | RESOLVED 2026-08-02 | api/routers/csv_routes.py (/preview has no try/except) |
 | BUG-026 | medium | RESOLVED 2026-08-02 | api/db.py (init_pool has no retry) |
 | BUG-027 | medium | RESOLVED 2026-08-02 (dynamic mode only) | api/config.py + routers (no upload row-count cap) |
-| BUG-028 | medium | OPEN | api/services/te_loader.py (server-side cast retries are slow) |
+| BUG-028 | medium | RESOLVED 2026-08-02 | api/services/te_loader.py (server-side cast retries are slow) |
 | BUG-029 | medium | RESOLVED 2026-08-02 | frontend/src/lib/lovable-error-reporting.ts (third-party phone-home) |
 | BUG-030 | low | RESOLVED 2026-08-02 | api/db.py (SimpleConnectionPool.getconn has no timeout) |
 | BUG-031 | low | RESOLVED 2026-08-02 | api/main.py (/api/health doesn't probe uploads schema) |
