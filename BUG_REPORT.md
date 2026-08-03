@@ -1043,7 +1043,7 @@ Contrast: `dynamic_loader` uses `cast_value()` from `csv_parse.py` to validate c
 ## BUG-030 — `SimpleConnectionPool.getconn()` has no timeout
 
 **Severity:** low (only hurts if a request handler leaks a connection)
-**Status:** OPEN
+**Status:** RESOLVED 2026-08-02
 **File:** `api/db.py` `Conn.__enter__`
 
 `_pool.getconn()` blocks indefinitely when `maxconn` connections are checked out. With `maxconn=8` and any handler that raises between borrow and return (BUG-025 territory), a slow leak eventually hangs the API. There's no `getconn(timeout=...)` on `SimpleConnectionPool`, and the pool-exhausted exception handler in `main.py` only fires for `PoolError`, not for hangs.
@@ -1056,9 +1056,32 @@ Contrast: `dynamic_loader` uses `cast_value()` from `csv_parse.py` to validate c
 
 **Suggested fix:** switch to `ThreadedConnectionPool` and wrap `getconn` in a `concurrent.futures.ThreadPoolExecutor.submit(...).result(timeout=5)` pattern, or add a hard `Depends(get_pool_slot)` with a semaphore that has a timeout.
 
-**Actions taken for resolution:** _(fill in when RESOLVED)_
+**Correction to the original diagnosis:** the "Steps to reproduce" above overstated the risk. `psycopg2.pool.AbstractConnectionPool.getconn()` does NOT block on exhaustion — it raises `psycopg2.pool.PoolError("connection pool exhausted")` immediately. The existing `pool_exhausted_handler` in `api/main.py` was already catching that and returning HTTP 503. So the "hangs forever" symptom was theoretical, not real.
 
-**Resolution:** _(fill in when RESOLVED — commit hash + one line)_
+The fix below is still worth landing for two independent reasons:
+
+1. **Thread-safety** — `SimpleConnectionPool` is not thread-safe (its own docstring warns of this). FastAPI runs sync route handlers on a threadpool, so concurrent `getconn`/`putconn` calls could corrupt pool state. `ThreadedConnectionPool` is the thread-safe version and should have been used from day one.
+2. **Defensive against future changes** — if a future psycopg2 version introduces blocking behaviour, or if we swap to a different pool implementation (e.g. `asyncpg` for async handlers), the timeout wrapper prevents a hang from being introduced silently.
+
+**Actions taken for resolution:**
+
+1. Added `POOL_GETCONN_TIMEOUT: float` setting to `api/config.py` — env var `API_POOL_GETCONN_TIMEOUT`, default 5.0 seconds. Documented as "bound how long a request handler waits to borrow a pool slot".
+2. Rewrote `api/db.py`:
+   - Switched `SimpleConnectionPool` → `ThreadedConnectionPool` (parallel FastAPI handlers can now borrow/return without blocking each other).
+   - Added a module-level `_getconn_executor` — a `ThreadPoolExecutor` with `max_workers = maxconn + 4`, so a burst of concurrent waiters can queue without the executor itself becoming a bottleneck.
+   - New `_borrow_with_timeout()` helper: submits `pool.getconn` to the executor and calls `Future.result(timeout=settings.POOL_GETCONN_TIMEOUT)`. On timeout, raises `psycopg2.pool.PoolError`, which the existing `pool_exhausted_handler` in `api/main.py` already maps to HTTP 503.
+   - `Conn.__enter__` now calls `_borrow_with_timeout()` instead of `_pool.getconn()`.
+   - Added a done-callback that returns any connection that arrives after the timeout back to the pool, so a slow-then-successful getconn doesn't permanently leak a slot.
+   - `close_pool()` now also shuts down the executor.
+3. Added `PoolTimeout` integration test class to `tests/test_api.py`:
+   - `setUpClass` swaps the module-level `_pool` and `_getconn_executor` for a 2-slot pool with a 500ms timeout (keeps the test fast).
+   - `test_exhausted_pool_raises_within_timeout` grabs both slots, calls `_borrow_with_timeout()` for a third connection, and asserts (a) `PoolError` was raised, (b) it fired within 3 seconds (upper bound guards against a hang), (c) the message mentions "pool". No lower bound — an immediate raise is the correct behaviour on today's psycopg2, and the point of the test is to catch any future regression to blocking.
+   - `tearDownClass` restores the originals so no other test is affected.
+4. Left `maxconn=8` unchanged — the timeout, not the pool size, is what BUG-030 addressed.
+
+**Verification note:** the test initially failed with `elapsed=0.00s < 0.4s` because I mistakenly assumed the pool blocked before raising. That failure surfaced the actual behaviour (immediate raise) and the test's lower-bound assertion was removed. See the "Correction to the original diagnosis" block above.
+
+**Resolution 2026-08-02:** pool switched to the thread-safe implementation, timeout wrapper added as defense-in-depth. Exhausted pool still returns 503 (already did before), but now via a bounded code path rather than an unguarded one. Regression test proves the wrapper doesn't itself introduce a hang.
 
 ---
 
@@ -1222,7 +1245,7 @@ _Rows are never deleted. When a bug is RESOLVED, update its Status column — do
 | BUG-027 | medium | RESOLVED 2026-08-02 (dynamic mode only) | api/config.py + routers (no upload row-count cap) |
 | BUG-028 | medium | OPEN | api/services/te_loader.py (server-side cast retries are slow) |
 | BUG-029 | medium | RESOLVED 2026-08-02 | frontend/src/lib/lovable-error-reporting.ts (third-party phone-home) |
-| BUG-030 | low | OPEN | api/db.py (SimpleConnectionPool.getconn has no timeout) |
+| BUG-030 | low | RESOLVED 2026-08-02 | api/db.py (SimpleConnectionPool.getconn has no timeout) |
 | BUG-031 | low | RESOLVED 2026-08-02 | api/main.py (/api/health doesn't probe uploads schema) |
 | BUG-032 | low | RESOLVED 2026-08-02 | api/db.py (no migration story for csv_files) |
 | BUG-033 | low | RESOLVED 2026-08-02 | frontend/AGENTS.md (orphaned lovable scaffolding) |

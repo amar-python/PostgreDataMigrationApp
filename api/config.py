@@ -23,6 +23,14 @@ class Settings:
 
     MAX_UPLOAD_BYTES: int = int(os.environ.get("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 
+    # BUG-030: bound how long a request handler waits to borrow a pool slot.
+    # If every one of maxconn connections is checked out (leak or long-running
+    # query), the (maxconn+1)-th request raises after this many seconds instead
+    # of blocking forever. The pool-exhausted handler in api/main.py returns 503.
+    POOL_GETCONN_TIMEOUT: float = float(
+        os.environ.get("API_POOL_GETCONN_TIMEOUT", "5.0")
+    )
+
     # Gate for the DELETE /api/csv/files/{id} endpoint.
     # Set API_ALLOW_DESTRUCTIVE=false in shared/prod to prevent accidental table drops.
     allow_destructive: bool = os.environ.get("API_ALLOW_DESTRUCTIVE", "true").lower() in (

@@ -249,3 +249,80 @@ class CsvPipelineWithDatabase(unittest.TestCase):
         """A CSV upload must never disturb the 12 tables the SQL suite asserts."""
         r = self.client.get("/api/csv/files")
         self.assertEqual(r.status_code, 200)
+
+
+@pytest.mark.integration
+class PoolTimeout(unittest.TestCase):
+    """BUG-030 regression: an exhausted pool must 503 within POOL_GETCONN_TIMEOUT
+    instead of blocking the request thread forever.
+
+    We swap the module-level pool for a tiny 2-slot instance (with a short
+    500ms timeout) so exhaustion is cheap to force, then hold both slots and
+    confirm the third acquisition raises PoolError promptly.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        # Save the original pool so we can restore it after the test.
+        from api import db
+        cls.db = db
+        cls.orig_pool = db._pool
+        cls.orig_executor = db._getconn_executor
+        cls.orig_timeout = db.settings.POOL_GETCONN_TIMEOUT
+
+        import psycopg2.pool
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            db._pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=1, maxconn=2,
+                host=db.settings.PG_HOST, port=db.settings.PG_PORT,
+                user=db.settings.PG_USER, password=db.settings.PG_PASSWORD,
+                dbname=db.settings.PG_DATABASE,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise AssertionError(
+                f"Could not open a test pool — Postgres is not reachable.\n"
+                f"  {type(exc).__name__}: {str(exc).strip().splitlines()[0]}\n"
+                f"{_HELP}"
+            ) from None
+        db._getconn_executor = ThreadPoolExecutor(
+            max_workers=4, thread_name_prefix="test-pool-getconn"
+        )
+        db.settings.POOL_GETCONN_TIMEOUT = 0.5  # keep the test fast
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.db._pool.closeall()
+        cls.db._getconn_executor.shutdown(wait=False, cancel_futures=True)
+        cls.db._pool = cls.orig_pool
+        cls.db._getconn_executor = cls.orig_executor
+        cls.db.settings.POOL_GETCONN_TIMEOUT = cls.orig_timeout
+
+    def test_exhausted_pool_raises_within_timeout(self):
+        """psycopg2's ThreadedConnectionPool.getconn() raises PoolError
+        immediately when the pool is exhausted — it does not block. Our
+        timeout wrapper still catches the error correctly and never lets a
+        request hang. The upper bound is what BUG-030 really guards against;
+        the lower bound is not asserted because a fast raise is the desired
+        behaviour, not a regression.
+        """
+        import time
+        import psycopg2.pool
+        # Borrow both slots and hold them.
+        c1 = self.db._pool.getconn()
+        c2 = self.db._pool.getconn()
+        try:
+            start = time.monotonic()
+            with self.assertRaises(psycopg2.pool.PoolError) as ctx:
+                self.db._borrow_with_timeout()
+            elapsed = time.monotonic() - start
+            # Timeout is 0.5s. If elapsed exceeds a few seconds, the pool
+            # started blocking (a bug or a future psycopg2 change) and our
+            # timeout wrapper failed to fire — exactly what BUG-030 guards.
+            self.assertLess(elapsed, 3.0,
+                f"BUG-030 regression: getconn blocked {elapsed:.2f}s "
+                f"instead of raising within POOL_GETCONN_TIMEOUT")
+            self.assertIn("pool", str(ctx.exception).lower())
+        finally:
+            self.db._pool.putconn(c1)
+            self.db._pool.putconn(c2)
